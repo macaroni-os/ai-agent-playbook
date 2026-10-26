@@ -23,4 +23,5 @@ the conventions the maintainers actually asked for.
 Feedback welcome via PR/issue — the playbook explicitly depends on being updated whenever a new
 convention is learned ("feed back into this playbook" is part of the loop).
 
-*Not official Macaroni OS documentation — a practitioner's playbook that may later become one.*
+*Originally a practitioner's playbook (20 agent PRs, Oct 2026), now a macaroni-os doc — keep feeding
+it: every review cycle should leave it sharper than it found it.*
