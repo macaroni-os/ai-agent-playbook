@@ -63,6 +63,14 @@ Known rough edges:
 - `incus exec` flag position is load-bearing: `incus exec <c> --env K=V -- bash -c "…"` —
   `--env` AFTER the command becomes a harmless argument and the variable silently stays unset
   (observed: push failing with "Invalid username or token" while the script "looked right").
+  Its sibling trap: FORGETTING `--env` entirely. Named remotes for public repos are anonymous
+  https — `git ls-remote` (and lease-value fetching) succeed without any token, only the push
+  fails, as a bare `rc=128`. When push returns 128, check the token plumbing first, not the
+  network and not the lease.
+- Detached-build polling: `pgrep -f "emerge --quiet-build"` ALSO matches the `bash -c` wrapper
+  of the very exec call that runs the pgrep (the pattern is in its own command line) → phantom
+  "STILL-RUNNING". Trust sentinels instead: log tail sentinels (`>>> Installing`, `Calculating
+  … done!`) plus `qlist -Iv <cp>` for ground truth.
   `/var/tmp/portage/<cat>/<pn>-<ver>/temp/`.
 - `mark-devkit` (install/build from source if the image lacks it): **use `autogen-thin`** for
   spec verification. Full `autogen` runs the merge phase, which needs `anise-portage-converter`
@@ -188,7 +196,15 @@ Known rough edges:
     bare `Fixes <full issue URL>`: it works mechanically but is not the convention. GitHub
     auto-closes the issue on merge for EVERY PR carrying `Closes` — so when one issue needs
     several PRs (dependency-layer enabler + the actual fix), put `Bugs:` on the enabler and
-    `Closes:` only on the completing PR, or the issue dies with the first merge.
+    `Closes:` only on the completing PR, or the issue dies with the first merge. (It has fired
+    for real: the aws-crt-python enabler closed the awscliv2 issue on merge — the recovery is a
+    status comment on the issue pointing at the still-open completing PR, not a silent reopen.)
+24. `github.match:` (package/cluster level) filters candidate versions as a regex on the
+    NORMALIZED version (leading `v` already stripped — `match: '^1.*'` matches tag `v1.2026.9`
+    and excludes `v8059`, proven by removing the selector and probing). Maintainer prefers it
+    over selector bounds for upstreams with broken/mixed version histories (plantuml: legacy
+    v8059/v2017.x tags sort above the modern 1.x line). Selector bounds remain the right tool
+    for compatibility caps with real semantics (openvdb `<12.0.0` vs openimageio).
 
 ## 4. Fix-pattern quick table
 
@@ -206,6 +222,9 @@ Known rough edges:
 | CMake `find_package(X CONFIG)` fails | is the provider even packaged? declare the DEPEND (pybind11 case); if no tree package provides it (gdk-pixbuf-xlib case) constrain the USE combo via `REQUIRED_USE` and document — never leave a silently-unbuildable combination |
 | `aclocal: You must have libxml2 …` after a libxml2 upgrade | libxml2 ≥ 2.12 stopped installing the `AM_PATH_XML2` m4 macro — replace with `PKG_CHECK_MODULES([XML2],[libxml-2.0])` (dvdauthor pattern); the error text is a red herring, libxml2 IS installed |
 | PEP517 wheel build imports the package itself (autocomplete/index generation) | every runtime dep is also a BUILD-time dep — declare them all (`_build_ac_index` awscliv2 pattern); a wheel phase failing on ModuleNotFoundError of a "runtime-only" dep is a spec bug |
+| Python dep dies at build with `TypeError: unsupported operand type(s) for \|` | that dep's own `Requires-Python` exceeds the distro interpreter (urllib3 ≥2.7 wants ≥3.10 vs tree py3.9; PEP604 unions evaluated at import). Version caps are then MANDATORY, not conservatism — prove it once by removing the cap and building (capture the TypeError), encode the cap with the rationale as a YAML comment (never in the dep string, §3.22) |
+| `.jar` (or other zip-magic) distfile explodes into WORKDIR at unpack | portage auto-unzips by file magic — `src_unpack() { cp "${DISTDIR}/${A}" "${WORKDIR}"/ \|\| die; }` and install the intact archive (jq-bin/plantuml pattern) |
+| old ebuild's SRC_URI host is dead (01.org → intel.com redirect) but the package still "exists" in-tree | check fetchability BEFORE treating the ebuild as functional; upstream may have consolidated (dleyna split repos → gitlab.gnome.org/World/dLeyna monorepo) — follow Gentoo's consolidated replacement package, add `!old/packages` blockers, and file the kit purge PR alongside |
 
 ## 5. Verification standard (per PR)
 
@@ -217,6 +236,12 @@ Known rough edges:
    `mark-devkit autogen-thin --specfile autogen.kit.d/base.yml --kitfile <merge file> --pkg <PN>`
    (PN not spec-key; `GITHUB_TOKEN` via `incus exec --env`) → check selected version, `SRC_URI`,
    `post_src_unpack`/`S` → deploy generated ebuild → build again.
+   **Merged-into-kit-fixups ≠ in-the-tree**: when a PR B depends on a dependency your PR A just
+   added to kit-fixups, A's ebuild is NOT in the kit until the MARK bot's merge/clean phase runs
+   (may be days). To verify B meanwhile, regenerate A's package from A's merged spec in a scratch
+   worktree (`git worktree add --detach /tmp/a-wt upstream/mark-unstable` → autogen-thin → deploy
+   its ebuild + files_dir into the kit copy) rather than blocking on the bot. (awscliv2 #492 vs
+   aws-crt-python #491.)
 4. Restore sandbox state (git checkout per kit, remove test dirs, shred temp token files).
 5. Only then: PR / review replies with the captured evidence (PR body carries the
    `Closes:`/`Bugs:` line per §3.23).
@@ -236,8 +261,10 @@ Known rough edges:
 - Feed every newly learned convention back into this playbook (it is the loop's memory).
 - **Orchestrator verification is not optional**: after every subagent that touched anything
   public, re-read the public state via API (PR head sha, commit count, author, thread
-  answered-count, issue comment rendered) and check it against the report. Subagent `rc=0` and
-  "pushed successfully" lines have both been wrong while the report was still honest.
+  answered-count, **file list via `pulls/<n>/files`**, issue comment rendered) and check it
+  against the report. Subagent `rc=0` and "pushed successfully" lines have both been wrong
+  while the report was still honest — and an honest report can still omit what the commit
+  INCLUDED (see §7m).
 - Review asks that contradict observed tool behavior (maintainer requests a key placement that
   probes show is inert): implement the ask **and** run a discriminating probe, reply with the
   evidence, offer both end-states, let the maintainer choose. This has converted a wrong instruction
@@ -291,6 +318,24 @@ l. Counting only `issues/<n>/comments` misses review feedback: inline comments l
    with EMPTY bodies (the content is in the comment list, timestamped at submit). A sweep that
    checks one or the other reports "all clear" while 3 new threads wait (observed on PR #485
    round 4 and macaroni-site #15). Sweep all three endpoints, always.
+m. `git add -A` in a kit-fixups checkout that has a live autogen `workdir/` commits GENERATOR
+   OUTPUT — generated ebuilds, Manifests, multi-MB distfile tarballs — straight into the PR
+   (observed: a 4.6 MB openvdb tarball + 4 artifact files reached a pushed commit; `git diff
+   --stat` before the add doesn't save you, `git show --stat` can scroll past it). Either rm the
+   workdirs before staging or stage targeted paths; ALWAYS audit the pushed PR via
+   `pulls/<n>/files` (§6). Repair without rewriting anything public-visible in semantics:
+   `git rm -r --cached <path>` + `--amend --no-edit` + lease-push.
+n. A subagent can DIE mid-task and return corrupt output (tool-call fragments, no report) —
+   but its sandbox work is usually intact and salvageable. Before re-dispatching anything,
+   inspect actual state: branch-vs-remote diff, wip commits, `/root/*.log` tails, PR head sha,
+   kits porcelain. One crashed review-round agent had already made both spec edits AND both
+   full builds (openvdb's 40-min compile included); finishing its push/reply phase manually
+   cost minutes versus redoing everything.
+o. Whitespace is NOT inert in spec `body:` fields: the templates normalize space-pairs to tabs,
+   so "cosmetically restoring" blank lines that a previous edit removed changed the generated
+   ebuild (`\tcode` → `\t code`). If the generated ebuild from the current spec is byte-identical
+   to the artifact you actually built, the whitespace state IS the verified state — don't churn
+   it. Judge formatting only by what lands in the generated ebuild.
 
 ## 8. Feedback sweep (do it between every task)
 
