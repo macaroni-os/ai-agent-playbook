@@ -56,6 +56,13 @@ Known rough edges:
   chunks (`echo <B64> | base64 -d > f`); huge single-arg base64 hits ARG_MAX — split.
 - MARK's `emerge` rejects bare `=cat/pkg` atoms: use exact versions or plain atoms.
 - Handy tools: `qlist -Iv <cat/pkg>`, `qdepends -Qt <pkg>` (reverse deps), logs under
+- **Non-trivial container work: don't triple-nest quotes.** Write the script on the host, transfer
+  it `base64 -w0` → `echo <B64> | base64 -d > /root/x.sh` → `bash /root/x.sh; shred -u /root/x.sh`.
+  Every quoting bug (silent host-side `$()` expansion, empty `$GT` from over-escaping) vanished
+  when we switched to this for multi-step push/verify scripts.
+- `incus exec` flag position is load-bearing: `incus exec <c> --env K=V -- bash -c "…"` —
+  `--env` AFTER the command becomes a harmless argument and the variable silently stays unset
+  (observed: push failing with "Invalid username or token" while the script "looked right").
   `/var/tmp/portage/<cat>/<pn>-<ver>/temp/`.
 - `mark-devkit` (install/build from source if the image lacks it): **use `autogen-thin`** for
   spec verification. Full `autogen` runs the merge phase, which needs `anise-portage-converter`
@@ -161,6 +168,27 @@ Known rough edges:
     `Signed-off-by: <the operator's git identity>` at the end of the commit message. Exact
     keywords are the maintainer's call — but the identity is always the human's configured one
     (§2), never one the agent made up.
+20. Version selection at generation time is driven by the SPEC's `selector:` — autogen-thin ignores
+    the merge atom's `conditions:`. That does NOT make `conditions:` optional: it drives the
+    post-generation phases — the **clean** phase (keeps a specific release available instead of
+    comparing ebuild counts across all versions) and the **merge phase onto the other release
+    branches**. When a version bound matters, write it in BOTH places. New packages additionally
+    need merge-phase PRs for `mark-xl`, `mark-iii` and `mark-31`, chosen per branch audience:
+    `mark-xl` is container/server-oriented; `mark-iii`/`mark-31` carry those packages *and* desktop
+    stuff. (Maintainer note on macaroni-os/ai-agent-playbook#2.)
+21. mark-devkit 0.35.4 field quirks: `github.per_page` is broken (off-by-one `page < NumPages`
+    yields zero tags — don't set it; raise `num_pages` only: GitHub's tag page size is 30, so
+    older maintained lines need ~12 pages, openssl uses 10). Template auto-applies `EAPI` — never
+    set an `eapi` var. `exclude:` parses on the ATOM (github-section placement is silently
+    ignored — proven by discriminating probe, and the maintainer accepted the evidence).
+22. No `#` comments inside ebuild dep strings (portage rejects them): dependency rationale goes
+    in YAML comments above the spec key, not in the rendered dep line.
+23. PR bodies reference their issue in the house form from the mark-issues README — a standalone
+    line `Closes: macaroni-os/mark-issues#<N>` (or `Bugs: macaroni-os/mark-issues#<N>`). Not a
+    bare `Fixes <full issue URL>`: it works mechanically but is not the convention. GitHub
+    auto-closes the issue on merge for EVERY PR carrying `Closes` — so when one issue needs
+    several PRs (dependency-layer enabler + the actual fix), put `Bugs:` on the enabler and
+    `Closes:` only on the completing PR, or the issue dies with the first merge.
 
 ## 4. Fix-pattern quick table
 
@@ -175,6 +203,9 @@ Known rough edges:
 | USE flag for software not in tree | rename to house convention, add real dep via follow-up PRs (oracle pattern) |
 | deprecation `#warning` + `-Werror` | remove the unused deprecated include (upstream commits often exist) |
 | parallel-build race upstream-unfixed | serialize the racy phase (`-j 1` guard) with upstream-issue citation |
+| CMake `find_package(X CONFIG)` fails | is the provider even packaged? declare the DEPEND (pybind11 case); if no tree package provides it (gdk-pixbuf-xlib case) constrain the USE combo via `REQUIRED_USE` and document — never leave a silently-unbuildable combination |
+| `aclocal: You must have libxml2 …` after a libxml2 upgrade | libxml2 ≥ 2.12 stopped installing the `AM_PATH_XML2` m4 macro — replace with `PKG_CHECK_MODULES([XML2],[libxml-2.0])` (dvdauthor pattern); the error text is a red herring, libxml2 IS installed |
+| PEP517 wheel build imports the package itself (autocomplete/index generation) | every runtime dep is also a BUILD-time dep — declare them all (`_build_ac_index` awscliv2 pattern); a wheel phase failing on ModuleNotFoundError of a "runtime-only" dep is a spec bug |
 
 ## 5. Verification standard (per PR)
 
@@ -187,7 +218,8 @@ Known rough edges:
    (PN not spec-key; `GITHUB_TOKEN` via `incus exec --env`) → check selected version, `SRC_URI`,
    `post_src_unpack`/`S` → deploy generated ebuild → build again.
 4. Restore sandbox state (git checkout per kit, remove test dirs, shred temp token files).
-5. Only then: PR / review replies with the captured evidence.
+5. Only then: PR / review replies with the captured evidence (PR body carries the
+   `Closes:`/`Bugs:` line per §3.23).
 
 ## 6. Subagent operating model (if your agent supports them)
 
@@ -202,6 +234,15 @@ Known rough edges:
   (`gh api -X POST repos/macaroni-os/kit-fixups/pulls/N/comments/<ID>/replies`), one-commit
   amend + lease-push, and re-verification after the change.
 - Feed every newly learned convention back into this playbook (it is the loop's memory).
+- **Orchestrator verification is not optional**: after every subagent that touched anything
+  public, re-read the public state via API (PR head sha, commit count, author, thread
+  answered-count, issue comment rendered) and check it against the report. Subagent `rc=0` and
+  "pushed successfully" lines have both been wrong while the report was still honest.
+- Review asks that contradict observed tool behavior (maintainer requests a key placement that
+  probes show is inert): implement the ask **and** run a discriminating probe, reply with the
+  evidence, offer both end-states, let the maintainer choose. This has converted a wrong instruction
+  into "Yeah, correct. my fault." plus a settled convention — evidence-based review replies are
+  welcome; silent deviation is not.
 
 ## 7. Known agent failure modes (all actually observed — check before assuming gremlins)
 
@@ -235,12 +276,28 @@ i. Agent INVENTS a git identity — plausible-looking name + domain never suppli
    via `gh api .../pulls/<n>/commits` that the head author moved — and check which repo/branch
    the PR head actually tracks first (intra-repo vs fork PRs — see the #489 lesson; an amended
    branch the PR does not track fixes nothing). NEVER rewrite merged history.
+j. `git push` returns **rc=0 and pushes nothing** (observed: transient auth oddity during the
+   openvdb session). Trust nothing but verification: after every push, `git ls-remote` the branch
+   AND check the PR head via `gh api repos/<org>/<repo>/pulls/<n> --jq .head.sha`. Take the lease
+   value from a FRESH `ls-remote` at push time, never from memory — an incorrectly remembered full
+   sha silently aborts a legitimate fix-push.
+k. Flag-order self-destruct: `git commit -qam --amend -m …` consumes `--amend` as the `-m`
+   **message** → commits titled `--amend` and/or an unintended second commit on a
+   single-commit PR branch (hit twice in one day, both times the push looked successful). After
+   any amend chain on a PR branch, verify `git log --format='%h %s' <base>..HEAD` shows exactly
+   one commit with the intended subject.
+l. Counting only `issues/<n>/comments` misses review feedback: inline comments live in
+   `pulls/<n>/comments`, and a maintainer submitting them produces `pulls/<n>/reviews` entries
+   with EMPTY bodies (the content is in the comment list, timestamped at submit). A sweep that
+   checks one or the other reports "all clear" while 3 new threads wait (observed on PR #485
+   round 4 and macaroni-site #15). Sweep all three endpoints, always.
 
 ## 8. Feedback sweep (do it between every task)
 
 ```
 gh api "repos/macaroni-os/kit-fixups/issues/<N>/comments?since=<ISO>"
 gh api "repos/macaroni-os/kit-fixups/pulls/<N>/comments?since=<ISO>"
+gh api "repos/macaroni-os/kit-fixups/pulls/<N>/reviews?since=<ISO>"   # empty-body COMMENTED = inline arrivals (§7l)
 gh pr view <N> --repo macaroni-os/kit-fixups --json state,mergeable
 ```
 …for every open PR of yours (also the kit repos!). Track the last-check timestamp. Review replies
