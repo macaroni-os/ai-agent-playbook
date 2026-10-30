@@ -67,6 +67,12 @@ Known rough edges:
   https — `git ls-remote` (and lease-value fetching) succeed without any token, only the push
   fails, as a bare `rc=128`. When push returns 128, check the token plumbing first, not the
   network and not the lease.
+- **Fork renames break pushes as a bare rc=128 too** (firebird session 2026-10-30): after a GitHub
+  repo rename the old URL 404s — `could not read Username for ...` means the REMOTE IS GONE, not a
+  bad token. Check `gh api repos/<owner>/<repo> --jq .full_name` before touching credentials, and
+  note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
+- **Never `shred -u` a script that bash is still executing** — the running wrapper's inode vanishes
+  and the detached chain dies mid-phase without an error line. Detach a small launcher instead.
 - Detached-build polling: `pgrep -f "emerge --quiet-build"` ALSO matches the `bash -c` wrapper
   of the very exec call that runs the pgrep (the pattern is in its own command line) → phantom
   "STILL-RUNNING". Trust sentinels instead: log tail sentinels (`>>> Installing`, `Calculating
@@ -205,6 +211,30 @@ Known rough edges:
     over selector bounds for upstreams with broken/mixed version histories (plantuml: legacy
     v8059/v2017.x tags sort above the modern 1.x line). Selector bounds remain the right tool
     for compatibility caps with real semantics (openvdb `<12.0.0` vs openimageio).
+    Beware (freetds probe 2026-10-30): `github.match:` is evaluated against the RAW release
+    title, NOT the title-transformed candidate — combining the two yields "No versions found".
+    Prerelease/tag-page garbage is already filtered natively; don't add `match:` to rescue it.
+25. Without an explicit `github.assets:` override the generator falls back to the
+    `api.github.com` auto-generated source tarball, whose name differs from the uploaded asset
+    (freetds: uploaded `freetds-<ver>.tar.bz2`). Set `assets:` when the uploaded asset name/
+    hash matters — and probe which one the selection actually fetched. When the needed source
+    asset carries a BUILD COUNTER not derivable from the tag (Firebird: tag `v4.0.7` but asset
+    `Firebird-4.0.7.3271-0.tar.xz`, and the tag auto-tarball lacks pre-generated `configure`),
+    bind it with `github.assets[].matcher` regex — the matcher resolves to the asset's
+    `browser_download_url` (verified in mark-devkit `GetAssets`) — rename the distfile to
+    `${PN}-${PV}` in `s:`/body and `post_src_unpack` mv the real directory.
+26. `github.assets[]` entry: `matcher:` and `url:` are **alternatives, not complements** —
+    `matcher` picks an asset from the release's asset list, `url` pins the download URL directly
+    (maintainer note on kit-fixups#510, 2026-10-30: "This is not needed"). Carrying both is
+    redundant; keep whichever the source actually needs and prove the generated `SRC_URI` is
+    unchanged when removing one (freetds probe: dropping `matcher` alongside `url` → generated
+    ebuild byte-identical).
+27. **No `${EPREFIX}` in new autogens** (maintainer convention, kit-fixups#507, 2026-10-30):
+    custom-path installation is no longer supported — users needing it use an `anise`-setup
+    chroot. Write plain `/usr`, `/etc/...`, `/var/...` in spec bodies. Pre-existing `${EPREFIX}`
+    in base/restored lines is not this PR's business (keep verbatim; a sweep is a separate ask).
+    Verify purges against the **generated** ebuild: sed the old baseline with the same
+    substitution and diff — byte-identity proves the change touched nothing else.
 
 ## 4. Fix-pattern quick table
 
@@ -224,6 +254,9 @@ Known rough edges:
 | PEP517 wheel build imports the package itself (autocomplete/index generation) | every runtime dep is also a BUILD-time dep — declare them all (`_build_ac_index` awscliv2 pattern); a wheel phase failing on ModuleNotFoundError of a "runtime-only" dep is a spec bug |
 | Python dep dies at build with `TypeError: unsupported operand type(s) for \|` | that dep's own `Requires-Python` exceeds the distro interpreter (urllib3 ≥2.7 wants ≥3.10 vs tree py3.9; PEP604 unions evaluated at import). Version caps are then MANDATORY, not conservatism — prove it once by removing the cap and building (capture the TypeError), encode the cap with the rationale as a YAML comment (never in the dep string, §3.22) |
 | `.jar` (or other zip-magic) distfile explodes into WORKDIR at unpack | portage auto-unzips by file magic — `src_unpack() { cp "${DISTDIR}/${A}" "${WORKDIR}"/ \|\| die; }` and install the intact archive (jq-bin/plantuml pattern) |
+| custom-make package dies with a bizarre guard error only under portage (e.g. Firebird examples `ifndef ROOT` → extauth fatal) | Portage exports `ROOT=/`; upstream makefiles using bare `ROOT` collide — `unset ROOT` in `src_compile` (or `emake ROOT=`) and comment-cite the issue |
+| upstream ships staged libs as absolute libtool symlinks into the build tree (libtommath/libtomcrypt pattern) | `cp -L` the real objects at install time — clean/merge phases dereference dangling symlinks later |
+| consumer fails `#include <pkg/sub/...>` after install although `doheader` ran | the API headers live in a SUBDIR (`include/firebird/`) that `doheader include/*` skips — recursive `doins -r include/<subdir>` into `/usr/include` |
 | old ebuild's SRC_URI host is dead (01.org → intel.com redirect) but the package still "exists" in-tree | check fetchability BEFORE treating the ebuild as functional; upstream may have consolidated (dleyna split repos → gitlab.gnome.org/World/dLeyna monorepo) — follow Gentoo's consolidated replacement package, add `!old/packages` blockers, and file the kit purge PR alongside |
 
 ## 5. Verification standard (per PR)
