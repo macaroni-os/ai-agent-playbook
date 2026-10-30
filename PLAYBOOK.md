@@ -244,6 +244,23 @@ Known rough edges:
     in base/restored lines is not this PR's business (keep verbatim; a sweep is a separate ask).
     Verify purges against the **generated** ebuild: sed the old baseline with the same
     substitution and diff — byte-identity proves the change touched nothing else.
+28. **Server services use STATIC uid/gid** (maintainer ask, kit-fixups#511): read the ids from
+    `macaroni-commons/packages/entities/groups.yaml` (the `entities` tool's list, per-service
+    `gid:` + `user.uid:` + homedir/shell). If the account is missing there, PR it FIRST, then use
+    it — never `enewuser <svc> -1 -1` for a server. Macaroni eclass `enewuser` =
+    `user uid shell home groups` — NO gid slot and a literal `/sbin/nologin` shell dies; the
+    static gid lands via a pre-created `enewgroup <svc> <gid>` (ntp/epmd precedent), homedir stays
+    `/dev/null` with data dirs handled by `diropts`/`keepdir`.
+29. Services ship BOTH init systems: unconditional OpenRC initd + a `systemd` USE flag gating the
+    `.service` install (maintainer ask, kit-fixups#511). Prefer the unit from the upstream tarball
+    (`*.service.in` — instantiate the @VARS@), `Type=` matched to how the daemon actually forks
+    (fbguard pattern); proof standard: two merges, `diff` of `qlist` shows exactly the one unit
+    line appearing under the USE.
+30. `simple-github.tmpl`'s generated `post_src_unpack` is unconditional `mv <user>-<repo>-* ${S}`
+    with no override var — WRONG for matcher-pinned uploaded assets whose tarball root differs
+    (firebird: internal dir `Firebird-4.0.7.3271-0`, so `FirebirdSQL-firebird-*` never matches;
+    `tar tjf` is the ground truth). Keep `simple.tmpl` + hand-written `post_src_unpack` for such
+    assets and show the probe when asked to switch (§6 both-end-states reply).
 
 ## 4. Fix-pattern quick table
 
