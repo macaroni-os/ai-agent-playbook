@@ -395,6 +395,18 @@ o. Whitespace is NOT inert in spec `body:` fields: the templates normalize space
    ebuild (`\tcode` → `\t code`). If the generated ebuild from the current spec is byte-identical
    to the artifact you actually built, the whitespace state IS the verified state — don't churn
    it. Judge formatting only by what lands in the generated ebuild.
+p. Cross-repo references have TWO traps. (1) Bare `#NNN` resolves **in the repo you are
+   posting to** — a status comment on mark-issues#844 saying "tracking #511" silently links
+   mark-issues#511 (`[gpu-configurator]…`), not kit-fixups#511. (2) The short `kit-fixups#511`
+   qualification does NOT autolink either — GitHub renders it as plain text (verified against
+   the comment's rendered HTML). The only linked forms are bare `#NNN` (same-repo refs), full
+   URLs, and **`owner/repo#NNN`** — write `macaroni-os/kit-fixups#511`. Ranges/slash-lists too:
+   `#504/#505/#506` leaves tails unlinked — write each one out. Audit before posting: strip
+   qualified `owner/repo#NNN` forms and URLs from the body; any remaining `#\d+` is a bug
+   (observed 2026-10-30 in four of my own #844 comments; fixed via
+   `gh api -X PATCH repos/.../issues/comments/<id>`, then RE-CHECK rendered HTML with
+   `-H "Accept: application/vnd.github.html"` — the raw markdown never shows whether a link
+   formed; edit history stays visible, own the correction).
 
 ## 8. Feedback sweep (do it between every task)
 
