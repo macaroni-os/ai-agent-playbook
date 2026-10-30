@@ -223,6 +223,18 @@ Known rough edges:
     bind it with `github.assets[].matcher` regex — the matcher resolves to the asset's
     `browser_download_url` (verified in mark-devkit `GetAssets`) — rename the distfile to
     `${PN}-${PV}` in `s:`/body and `post_src_unpack` mv the real directory.
+26. `github.assets[]` entry: `matcher:` and `url:` are **alternatives, not complements** —
+    `matcher` picks an asset from the release's asset list, `url` pins the download URL directly
+    (maintainer note on kit-fixups#510, 2026-10-30: "This is not needed"). Carrying both is
+    redundant; keep whichever the source actually needs and prove the generated `SRC_URI` is
+    unchanged when removing one (freetds probe: dropping `matcher` alongside `url` → generated
+    ebuild byte-identical).
+27. **No `${EPREFIX}` in new autogens** (maintainer convention, kit-fixups#507, 2026-10-30):
+    custom-path installation is no longer supported — users needing it use an `anise`-setup
+    chroot. Write plain `/usr`, `/etc/...`, `/var/...` in spec bodies. Pre-existing `${EPREFIX}`
+    in base/restored lines is not this PR's business (keep verbatim; a sweep is a separate ask).
+    Verify purges against the **generated** ebuild: sed the old baseline with the same
+    substitution and diff — byte-identity proves the change touched nothing else.
 
 ## 4. Fix-pattern quick table
 
