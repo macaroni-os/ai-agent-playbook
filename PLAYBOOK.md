@@ -225,7 +225,7 @@ Known rough edges:
     `${PN}-${PV}` in `s:`/body and `post_src_unpack` mv the real directory.
 26. `github.assets[]` entry: `matcher:` and `url:` are **alternatives, not complements** —
     `matcher` picks an asset from the release's asset list, `url` pins the download URL directly
-    (maintainer note on kit-fixups#510, 2026-10-30: "This is not needed"). Carrying both is
+    (maintainer note on macaroni-os/kit-fixups#510, 2026-10-30: "This is not needed"). Carrying both is
     redundant. **Maintainer's settled preference (geaaru, same PR thread, later that day): keep
     `matcher`, drop `url`** — "less text is better" and upstream URL changes are easier to fix.
     Prefer `name: '{{ .Values.p }}.tar.<ext>'` over `{{ .Values.pn }}-{{ .Values.version }}` —
@@ -238,24 +238,25 @@ Known rough edges:
     the matcher filters). Matcher resolves to `browser_download_url` of the uploaded asset →
     prove any such swap by regenerating and diffing against the baseline ebuild (freetds:
     byte-identical).
-27. **No `${EPREFIX}` in new autogens** (maintainer convention, kit-fixups#507, 2026-10-30):
+27. **No `${EPREFIX}` in new autogens** (maintainer convention, macaroni-os/kit-fixups#507, 2026-10-30):
     custom-path installation is no longer supported — users needing it use an `anise`-setup
     chroot. Write plain `/usr`, `/etc/...`, `/var/...` in spec bodies. Pre-existing `${EPREFIX}`
     in base/restored lines is not this PR's business (keep verbatim; a sweep is a separate ask).
     Verify purges against the **generated** ebuild: sed the old baseline with the same
     substitution and diff — byte-identity proves the change touched nothing else.
-28. **Server services use STATIC uid/gid** (maintainer ask, kit-fixups#511): read the ids from
+28. **Server services use STATIC uid/gid** (maintainer ask, macaroni-os/kit-fixups#511): read the ids from
     `macaroni-commons/packages/entities/groups.yaml` (the `entities` tool's list, per-service
     `gid:` + `user.uid:` + homedir/shell). If the account is missing there, PR it FIRST, then use
     it — never `enewuser <svc> -1 -1` for a server. Macaroni eclass `enewuser` =
     `user uid shell home groups` — NO gid slot and a literal `/sbin/nologin` shell dies; the
     static gid lands via a pre-created `enewgroup <svc> <gid>` (ntp/epmd precedent), homedir stays
     `/dev/null` with data dirs handled by `diropts`/`keepdir`.
-29. Services ship BOTH init systems: unconditional OpenRC initd + a `systemd` USE flag gating the
-    `.service` install (maintainer ask, kit-fixups#511). Prefer the unit from the upstream tarball
-    (`*.service.in` — instantiate the @VARS@), `Type=` matched to how the daemon actually forks
-    (fbguard pattern); proof standard: two merges, `diff` of `qlist` shows exactly the one unit
-    line appearing under the USE.
+29. **Init system is USE-SELECTED, not additive** (maintainer ask + follow-up, macaroni-os/kit-fixups#511):
+    `if use systemd ; then systemd_dounit ...; else newinitd ...; fi` — exactly ONE init system
+    installs (geaaru explicitly moved `newinitd` into the `else`). Prefer the unit from the
+    upstream tarball (`*.service.in` — instantiate the @VARS@), `Type=` matched to how the daemon
+    actually forks (fbguard pattern); proof standard: one merge per USE side, `qlist` shows only
+    the unit OR only the initd.
 30. `simple-github.tmpl`'s generated `post_src_unpack` is unconditional `mv <user>-<repo>-* ${S}`
     with no override var — WRONG for matcher-pinned uploaded assets whose tarball root differs
     (firebird: internal dir `Firebird-4.0.7.3271-0`, so `FirebirdSQL-firebird-*` never matches;
