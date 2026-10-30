@@ -226,9 +226,18 @@ Known rough edges:
 26. `github.assets[]` entry: `matcher:` and `url:` are **alternatives, not complements** —
     `matcher` picks an asset from the release's asset list, `url` pins the download URL directly
     (maintainer note on kit-fixups#510, 2026-10-30: "This is not needed"). Carrying both is
-    redundant; keep whichever the source actually needs and prove the generated `SRC_URI` is
-    unchanged when removing one (freetds probe: dropping `matcher` alongside `url` → generated
-    ebuild byte-identical).
+    redundant. **Maintainer's settled preference (geaaru, same PR thread, later that day): keep
+    `matcher`, drop `url`** — "less text is better" and upstream URL changes are easier to fix.
+    Prefer `name: '{{ .Values.p }}.tar.<ext>'` over `{{ .Values.pn }}-{{ .Values.version }}` —
+    `.Values.p` explodes to `pn-PV` **without** any `-rX` suffix (verified: `revision: 1` yields
+    `pkg-1.0-r1.ebuild` while the dist stays `pkg-1.0.tar.bz2`), so the same pair survives bumps.
+    Matcher semantics (freetds probes 2026-10-30): **regex, NOT anchored** — substring matches
+    select the asset (bare `freetds` matched); unescaped dots match literally-different chars
+    (`freetds.1.5.16.tar.bz2` hit `freetds-1.5.16.tar.bz2`), so escape your dots; zero-match fails
+    with log line `no asset found for matcher <X>` and no ebuild (run a negative control to prove
+    the matcher filters). Matcher resolves to `browser_download_url` of the uploaded asset →
+    prove any such swap by regenerating and diffing against the baseline ebuild (freetds:
+    byte-identical).
 27. **No `${EPREFIX}` in new autogens** (maintainer convention, kit-fixups#507, 2026-10-30):
     custom-path installation is no longer supported — users needing it use an `anise`-setup
     chroot. Write plain `/usr`, `/etc/...`, `/var/...` in spec bodies. Pre-existing `${EPREFIX}`
