@@ -205,6 +205,13 @@ Known rough edges:
     over selector bounds for upstreams with broken/mixed version histories (plantuml: legacy
     v8059/v2017.x tags sort above the modern 1.x line). Selector bounds remain the right tool
     for compatibility caps with real semantics (openvdb `<12.0.0` vs openimageio).
+    Beware (freetds probe 2026-10-30): `github.match:` is evaluated against the RAW release
+    title, NOT the title-transformed candidate — combining the two yields "No versions found".
+    Prerelease/tag-page garbage is already filtered natively; don't add `match:` to rescue it.
+25. Without an explicit `github.assets:` override the generator falls back to the
+    `api.github.com` auto-generated source tarball, whose name differs from the uploaded asset
+    (freetds: uploaded `freetds-<ver>.tar.bz2`). Set `assets:` when the uploaded asset name/
+    hash matters — and probe which one the selection actually fetched.
 
 ## 4. Fix-pattern quick table
 
