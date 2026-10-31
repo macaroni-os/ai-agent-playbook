@@ -121,7 +121,11 @@ Known rough edges:
 3. Templates: `simple-github.tmpl` for github/api tarballs (it generates
    `post_src_unpack() { mv <user>-<repo>-* ${S}; }`). Binary/asset-based packages: `simple.tmpl`
    + explicit `s:` (often `'${WORKDIR}'` for flat tarballs) + `newbin` in `src_install` — keep
-   default `src_unpack` behavior where possible.
+   default `src_unpack` behavior where possible. Set `s:` ONLY when the unpack root differs from
+   portage's default `${WORKDIR}/${PN}-${PV}` — a source-tarball flavour usually needs NOTHING
+   (archive root == `${P}`); the versionless wrapper dir of a `-bin` asset is the case that
+   needs it (maintainer words: "This is the default. It's only needed for pi-bin",
+   macaroni-os/kit-fixups#512 review, 2026-10-31).
 4. `github.user: X` (+ `repo:` only if != PN); the leading `v` of tags is stripped automatically —
    write transforms only for what remains. **The release TITLE often drives version parsing**
    (e.g. `Bun v1.4.4`, `pnpm 12.6.0`) — transform titles accordingly. Exclude pre-releases with
@@ -262,6 +266,16 @@ Known rough edges:
     (firebird: internal dir `Firebird-4.0.7.3271-0`, so `FirebirdSQL-firebird-*` never matches;
     `tar tjf` is the ground truth). Keep `simple.tmpl` + hand-written `post_src_unpack` for such
     assets and show the probe when asked to switch (§6 both-end-states reply).
+31. Shared-upstream flavour pairs (`<pn>` + `<pn>-bin` built from the same repository) get a
+    **dedicated autogen cluster key** whose `defaults:` define the common parts once — github
+    user/repo, `template`, and the shared `restrict`/`extra_envs` — while each entry under
+    `packages:` keeps only its flavour-specific keys (maintainer ask on macaroni-os/kit-fixups#512,
+    geaaru, 2026-10-31). `defaults:` IS an atom (mark-devkit `AutogenDefinition.Defaults` is
+    `*AutogenAtom`), so vars-style keys belong under `defaults.vars:` — merged per-key with each
+    package's own `vars`; placed directly under `defaults:` they are silently INERT
+    (discriminating probe: the regenerated ebuild loses RESTRICT/QA_PREBUILT). Proof standard:
+    both flavours regenerate byte-identical after the move (verified on
+    macaroni-os/kit-fixups#512).
 
 ## 4. Fix-pattern quick table
 
