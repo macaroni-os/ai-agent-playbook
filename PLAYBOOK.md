@@ -276,6 +276,40 @@ Known rough edges:
     (discriminating probe: the regenerated ebuild loses RESTRICT/QA_PREBUILT). Proof standard:
     both flavours regenerate byte-identical after the move (verified on
     macaroni-os/kit-fixups#512).
+32. **Every extra distfile must be an `assets:` spec key — USE-conditional ones included**
+    (maintainer ask, macaroni-os/kit-fixups#513, 2026-10-31): a top-level `SRC_URI+=` append in
+    `body` is invisible to the generator's Manifest — the autogen-generated Manifest silently
+    lacks everything behind a USE. Express optional module tarballs as
+    `assets: [{name, url, use: <flag>}]`; pin the versions/shas as `vars:` (`ndk_version: 0.3.3`)
+    and interpolate them `{{ .Values.ndk_version }}` into `url:`/`name:` (both render in the
+    values context — lang-kit go/zig-bin precedents), so the generated ebuild carries literals
+    and a bump has ONE source. Two sharp edges: **the main release asset must be re-listed as
+    the first entry once the assets list is non-empty** (mark-devkit does NOT keep the release
+    tarball implicitly — maintainer words), and when the distfile name and the pinned commit
+    differ, use two vars (name: `push_stream_pv`, url/workdir: `push_stream_sha`). Never assume
+    a release ASSET equals the tag ARCHIVE — in either direction: nginx's official assets ship a
+    generated top-level `./configure` and `man/`, its tag archives have neither (they carry
+    `auto/configure`, `docs/man`); firebird was the reverse case (§3.25). Probe the tarball you
+    pin.
+33. **Autogen conversion PRs carry the files tree too** (macaroni-os/kit-fixups#513): the
+    CURRENT convention is a **flat package-named directory** — cluster `files_dir:
+    '{{ .Values.pn }}'` and files live at `<kit>/autogen.kit.d/<pn>/` (NO category segment,
+    NO `files/` subdir; contents sit directly under `<pn>/`, e.g. `autogen.kit.d/nginx/nginx.conf`,
+    `autogen.kit.d/caddy/Caddyfile`, `autogen.kit.d/glusterfs/*.patch`). Precedents: caddy,
+    glusterfs, thin-provisioning-tools. The older `autogen.kit.d/<category>/<pn>/files/` form
+    (debian-sources, anise, glibc) still exists but is NOT what maintainers want in new
+    autogen PRs — I first used it and geaaru corrected me: "the convention for files_dir is
+    `autogen.kit.d/<pn>`, not with category name and/or `files` subdir." `mark-devkit` resolves
+    `files_dir` relative to `autogen.kit.d/`, and `autogen-thin` copies that dir into the
+    generated tree as `files/` (so `${FILESDIR}/…` still resolves). "The files are already in
+    the kit repo" does not fly — the reviewer flags it as "patches are not pushed in this PR".
+34. **Review hygiene bar** (geaaru, macaroni-os/kit-fixups#513): drop EVERY commented-out code
+    line from a ported body (inert table entries, dead postinst blocks, old `mod_uri`/`mod_doc`
+    variants — prose comments stay); tracker-reference comments (bugs.funtoo.org FL-####,
+    bugs.gentoo.org #####) are dropped too (§3.18 extended); a stale blocker atom gets removed
+    even though it was a verbatim tree-ebuild line — the "keep verbatim for scope discipline"
+    instinct gets flagged (`!www-server/nginx:0` — a typo at a nonexistent category: "This seems
+    a deprecated line that could be removed").
 
 ## 4. Fix-pattern quick table
 
@@ -299,6 +333,8 @@ Known rough edges:
 | upstream ships staged libs as absolute libtool symlinks into the build tree (libtommath/libtomcrypt pattern) | `cp -L` the real objects at install time — clean/merge phases dereference dangling symlinks later |
 | consumer fails `#include <pkg/sub/...>` after install although `doheader` ran | the API headers live in a SUBDIR (`include/firebird/`) that `doheader include/*` skips — recursive `doins -r include/<subdir>` into `/usr/include` |
 | old ebuild's SRC_URI host is dead (01.org → intel.com redirect) but the package still "exists" in-tree | check fetchability BEFORE treating the ebuild as functional; upstream may have consolidated (dleyna split repos → gitlab.gnome.org/World/dLeyna monorepo) — follow Gentoo's consolidated replacement package, add `!old/packages` blockers, and file the kit purge PR alongside |
+| `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
+| "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
 
 ## 5. Verification standard (per PR)
 
@@ -421,7 +457,20 @@ p. Cross-repo references have TWO traps. (1) Bare `#NNN` resolves **in the repo 
    (observed 2026-10-30 in four of my own #844 comments; fixed via
    `gh api -X PATCH repos/.../issues/comments/<id>`, then RE-CHECK rendered HTML with
    `-H "Accept: application/vnd.github.html"` — the raw markdown never shows whether a link
-   formed; edit history stays visible, own the correction).
+   formed; edit history stays visible, own the correction). Caveat found later (PR
+   macaroni-os/kit-fixups#513): via `gh api --jq`, that Accept header can still return the RAW
+   markdown for PR bodies and review comments — the render ground truth is graphql
+   `bodyHTML` (`pullRequest(number:N){ bodyHTML }`).
+q. `bash -n` is NOT a functional gate: `declare -A mod{pn,pv}` brace-expands to `modpn`/`modpv`
+   — the associative arrays are silently never created, `${!mod_pn[@]}` comes back empty, the
+   `IUSE+=` loops no-op, and portage then masks the ebuild (`USE flag … not in IUSE`) while every
+   syntax check passes. The underscores belong INSIDE the items (`mod{_pn,_pv}`) like the tree
+   original had them. Ebuild changes are proven by dep-calc + merge (`emerge -1`), never less.
+r. `emerge --changed-use =cat/pkg-<ver>` is a **no-op when a different version is installed** —
+   changed-use only considers installed packages. A USE-gated test you believe you ran simply
+   never ran, and the transcript still looks alive. To prove a specific flag: `package.use`
+   entry + plain `emerge -1 =cat/pkg-<ver>`, then grep a functional trace in the built artifact
+   (e.g. `nginx -V` showing `add-module=…njs-1.0.2…`) — not just the install line.
 
 ## 8. Feedback sweep (do it between every task)
 
