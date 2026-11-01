@@ -311,6 +311,36 @@ Known rough edges:
     instinct gets flagged (`!www-server/nginx:0` — a typo at a nonexistent category: "This seems
     a deprecated line that could be removed").
 
+ 35. **Version strings render from `.Values`, never `${PV}`** (maintainer ask,
+     macaroni-os/kit-fixups#514, 2026-11-01): in a spec `body:` write `{{ .Values.pv }}` (and
+     `{{ .Values.version }}`) — NOT the shell var `${PV}` — so the generated ebuild carries the
+     literal (§3.8/§3.15 principle applied to version literals too). When a source flavour must
+     reference the exact tag build, stamp `{{ .Values.pv }}-{{ substr 0 7 .Values.sha }}` (sprig
+     `substr`, already used in-repo by the fish cluster) — e.g. `-X main.Version=3.1.1-9db7df7`.
+     **BUT: `.Values.sha` is the GitHub release `target_commitish`, not a commit sha.** For a repo
+     using `ignore_tags: true` the releases' target_commitish is a branch name (mimir: literally
+     `main`), so the stamp renders `3.2.4-main` — for such repos fall back to plain `{{ .Values.pv }}`
+     (or a tag-pinned sha from elsewhere). The distfile auto-name suffix (`<pn>-<pv>-<sha7>.tar.gz`)
+     is the tag-object sha, which can differ from the unpack-root sha7 (peeled vs tag object) — the
+     `mv <user>-<repo>-*` wildcard in §3.36 absorbs either.
+ 36. **Source flavour = generator tarball recovery + `post_src_unpack`, assets live under `-bin`**
+     (settled convention, macaroni-os/kit-fixups#514 review, geaaru 2026-11-01, verified on
+     tempo/loki/mimir): do NOT list the GitHub `archive/refs/tags/...` tarball as an explicit source
+     asset. Put the whole `assets:` list on the `-bin` package entry (the source entry simply has no
+     `assets:`), and let `builtin-github` recover the release's
+     `api.github.com/repos/<user>/<repo>/tarball/<tag>` for the source entry.
+     Its unpack root is `<user>-<repo>-<sha7>` (≠ `${P}`) so the source body needs
+     `post_src_unpack() { mv {{ .Values.github_user }}-{{ .Values.github_repo }}-* "${S}"; }` (the
+     same shape as `simple-github.tmpl` and the prometheus-exporters cluster) — that wildcard also
+     makes `s:` unnecessary for the source flavour. PROOF the recovery is equivalent to the tag
+     archive (the maintainer's condition "if it works the same way"): fetch both and
+     `diff -r -q` — tempo: 15740 vs 15740 files, 0 deltas. `github_user` renders (`grafana`), no
+     literal needed. Bin ebuilds must regenerate BYTE-IDENTICAL after moving assets into them (§3.31
+     bar) — if not, the move changed semantics; revert. For a **prefixed-tag** repo (mimir tags are
+     `mimir-3.2.4`, not `v...`), plain `query: releases` yields "No versions found" because the
+     tag↔release cross-check skips releases whose tag isn't on the tags-endpoint page — set
+     `github.ignore_tags: true` (see §3.4/§7s).
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -471,6 +501,15 @@ r. `emerge --changed-use =cat/pkg-<ver>` is a **no-op when a different version i
    never ran, and the transcript still looks alive. To prove a specific flag: `package.use`
    entry + plain `emerge -1 =cat/pkg-<ver>`, then grep a functional trace in the built artifact
    (e.g. `nginx -V` showing `add-module=…njs-1.0.2…`) — not just the install line.
+
+s. **Multi-module Go upstreams break mark-go-bundle** (alloy probe 2026-11-01): the golang
+   extension bundles only the FIRST artefact's top-level `go.sum`, so a repo whose real `main`
+   lives in a second module wired via `replace ../` (grafana/alloy's `collector/`) is missing every
+   module@version that appears only in the submodule's go.sum (alloy: 49 — root 1228 zip-rows vs
+   collector 1241, 0 hash mismatches) and the `GOPROXY=off` build dies with "module lookup disabled"
+   at every engine-registry import site. Do NOT spec such a source flavour until the extension can
+   feed multiple go.sums (feature ask: `extensions_defs: golang: opts:` extra-go-sum paths);
+   ship the -bin flavour and report the set-diff evidence (macaroni-os/mark-issues#848).
 
 ## 8. Feedback sweep (do it between every task)
 
