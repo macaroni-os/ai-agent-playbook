@@ -341,6 +341,51 @@ Known rough edges:
      tag↔release cross-check skips releases whose tag isn't on the tags-endpoint page — set
      `github.ignore_tags: true` (see §3.4/§7s).
 
+ 37. **Go source flavours inherit `go-module` — even vendored, even when no bundle is needed**
+      (maintainer ask, macaroni-os/mark-issues#848 reopen, geaaru 2026-11-02: "This probably could
+      be fixed if the ebuild uses the `go-module` eclass where we try to override existing go.mod"
+      and "The `go-module` eclass could be used also if the go bundle is not needed"). A
+      hand-written `go build -mod=vendor` is green on the sandbox tree and dies in the merge phase
+      on a release branch the moment upstream's `go` directive exceeds that tree's toolchain
+      (observed: `tempo-3.1.1` → `go.mod requires go >= 1.27.3 (running go 1.27.2;
+      GOTOOLCHAIN=local)` while my unstable sandbox had 1.27.3). The eclass's
+      `_go-module_check_gotoolchain` (exported `src_prepare`) rewrites the `go` line in go.mod to
+      the local `GOVERSION` on ANY mismatch — `EGO_OVERRIDE_GOMOD=0` disables it — ewarning
+      "Package needs go X. Forcing local version Y." Sharp edges: EAPI **7 only**;
+      `EXPORT_FUNCTIONS src_unpack src_prepare pkg_postinst`, and `go-module_src_unpack` falls to
+      `default` when A has no `mark-go-bundle` distfile and `EGO_SUM`/`EGO_VENDOR` are empty — so
+      the §3.36 `post_src_unpack` mv-shape keeps working untouched; the check reads go.mod at
+      `${S}`, so multi-module builds (alloy, §7s) must mirror the override across EVERY local
+      module wired via `replace ../..` — a collector-only override still died on `../syntax`;
+      proven pattern is a `post_src_prepare()` loop `find "${S}" -name go.mod -not -path
+      '*/vendor/*'` with the eclass's own sed, one ewarn per module; add the inherit on the
+      SOURCE cluster entries only — package-level `vars.inherit` REPLACES the `defaults.vars` list (mark-devkit 0.35.4 probe: `[go-module]`
+      alone generated `inherit go-module`), so repeat `user`/`systemd` per entry; `-bin` ebuilds
+      must regenerate byte-identical. The rewrite goes BOTH directions on mismatch — upward
+      (1.26.10→1.27.2) verified harmless on loki/mimir. Tree precedents: gitlab-runner, yq-go. A maintainer
+      toolchain bump can hotfix the branch meanwhile (macaroni-os/macaroni-funtoo@4b940f8) — that
+      does NOT replace the eclass ask.
+
+ 38. **Not every fix needs release-branch PRs — check what the branch actually carries**
+      (macaroni-os/mark-issues#848 round 2): the kit-fixups release branches hold only
+      merge-atom recipes (`<kit>/merge.kit.d/*.yml`, e.g. added by kit-fixups#518/#519/#520) whose
+      `sources:` point at `<kit>@mark-unstable` — a SPEC content fix merges on unstable alone and
+      the bot re-propagates. Before filing per-branch PRs, `git ls-tree -r origin/<branch>` the
+      kit-fixups branch and edit only what exists (§3.20's per-branch PRs are for the ATOM SET).
+      Caveat when the promoted kit already carries a same-PV ebuild (observed:
+      core-server-kit@mark-xl `tempo-3.1.1.ebuild` pre-fix): whether the merge pipeline re-copies
+      changed content under the same PV is maintainer territory — surface it with the evidence and
+      offer the `-r1` bump, do not execute it unasked (§9).
+
+ 39. **Agent PRs carry the `ai_ass` (AI Assisted) label where the repo defines it** (operator
+      direction, 2026-11-02; the label exists in macaroni-os/kit-fixups, not in every org repo):
+      at PR-creation time check `gh api repos/<org>/<repo>/labels --jq '.[].name'` and, if
+      `ai_ass` is defined, set it on the issue side of the PR:
+      `gh api -X PUT repos/<org>/<repo>/issues/<pr>/labels -f 'labels[]=ai_ass'`. Do not create
+      the label in repos that lack it, and do not label issues/commits — PRs only. Applies to
+      every PR the agent opens that day, propagation rounds included; verify after setting
+      (`pulls/<n>` → `.labels`).
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -365,6 +410,7 @@ Known rough edges:
 | old ebuild's SRC_URI host is dead (01.org → intel.com redirect) but the package still "exists" in-tree | check fetchability BEFORE treating the ebuild as functional; upstream may have consolidated (dleyna split repos → gitlab.gnome.org/World/dLeyna monorepo) — follow Gentoo's consolidated replacement package, add `!old/packages` blockers, and file the kit purge PR alongside |
 | `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
 | "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
+| `go: go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)` — builds on unstable, fails on a release branch | inherit `go-module` (§3.37): its `src_prepare` rewrites the go.mod directive to the local toolchain; do NOT version-pin or downgrade the source to appease a tree |
 
 ## 5. Verification standard (per PR)
 
@@ -384,7 +430,7 @@ Known rough edges:
    aws-crt-python #491.)
 4. Restore sandbox state (git checkout per kit, remove test dirs, shred temp token files).
 5. Only then: PR / review replies with the captured evidence (PR body carries the
-   `Closes:`/`Bugs:` line per §3.23).
+   `Closes:`/`Bugs:` line per §3.23; label the PR `ai_ass` where the repo defines it, §3.39).
 
 ## 6. Subagent operating model (if your agent supports them)
 
@@ -419,8 +465,9 @@ a. `gh api -f body=@file` does **not** expand `@file` → the literal path gets 
 b. Shell-quoting slips echoing `$(gh auth token)` into transcripts → rotate (`gh auth refresh`).
 c. EOF-append rebase conflicts in `<kit>/autogen.kit.d/base.yml` (several PRs append the same
    file end): resolve = keep both blocks, strip ALL conflict markers, then **verify**:
-   `grep -cE "^(<<<<<<<|=======|>>>>>>>)"` must be 0, `yaml.safe_load` must pass, diff your block
-   against the pre-rebase version (watch trailing nested list items getting eaten), amend to one
+   `grep -cE "^(<<<<<<<|=======|>>>>>>>)"` must be 0, `yaml.safe_load` must pass (a plain
+   mark-contrib container ships no PyYAML — a clean `mark-devkit` parse is the stand-in gate),
+   diff your block against the pre-rebase version (watch trailing nested list items getting eaten), amend to one
    commit, lease-push, re-run autogen-thin as functional proof.
 d. `sed -n 'A,Bp'`/line-number edits drift after a rewrite — prefer pattern-based deletion.
 e. Agent claims “verified X” in the same message that performed no verification — re-run the claim
@@ -510,6 +557,16 @@ s. **Multi-module Go upstreams break mark-go-bundle** (alloy probe 2026-11-01): 
    at every engine-registry import site. Do NOT spec such a source flavour until the extension can
    feed multiple go.sums (feature ask: `extensions_defs: golang: opts:` extra-go-sum paths);
    ship the -bin flavour and report the set-diff evidence (macaroni-os/mark-issues#848).
+   Follow-up finding (go-module round): the same multi-module shape breaks the go-directive
+   override too — every `replace ../..` sibling module carries its own `go` floor, see §3.37.
+
+t. **A green merge in the sandbox only proves the UNSTABLE tree** — merge-phase builds run against
+   the release branches' older toolchains (observed: vendored `go build` passed on my 1.27.3
+   sandbox and failed `GOTOOLCHAIN=local` on a 1.27.2 release branch — the #848 tempo reopen).
+   Language floors (`go` directives, `requires-python`, C++ standards) must be checked against the
+   release trees the packages propagate to (macaroni-os/core-kit / lang-kit branch contents), and
+   the house escape hatch used, not a version freeze: `go-module` for Go (§3.37), selector caps
+   with rationale for build tools (§3.12).
 
 ## 8. Feedback sweep (do it between every task)
 
