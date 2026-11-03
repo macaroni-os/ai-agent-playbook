@@ -59,7 +59,10 @@ Known rough edges:
 - **Non-trivial container work: don't triple-nest quotes.** Write the script on the host, transfer
   it `base64 -w0` → `echo <B64> | base64 -d > /root/x.sh` → `bash /root/x.sh; shred -u /root/x.sh`.
   Every quoting bug (silent host-side `$()` expansion, empty `$GT` from over-escaping) vanished
-  when we switched to this for multi-step push/verify scripts.
+  when we switched to this for multi-step push/verify scripts. The rule also covers "simple"
+  one-liners: when the assembled host command is double-quoted, any `$f`/`$?` inside
+  `bash -c "…"` expands HOST-SIDE (observed: literal `DONE-RC=$?` recorded in a log, empty
+  `== ` lines) — once a container command touches `$`, go base64-script.
 - `incus exec` flag position is load-bearing: `incus exec <c> --env K=V -- bash -c "…"` —
   `--env` AFTER the command becomes a harmless argument and the variable silently stays unset
   (observed: push failing with "Invalid username or token" while the script "looked right").
@@ -104,7 +107,10 @@ Known rough edges:
 - Token hygiene for agents: never interpolate `$(gh auth token)` inside `printf "…"` strings
   (it can echo into transcripts); assign to a variable first, silence push output
   (`git push … >/dev/null 2>&1; echo rc=$?`), and scrub anything printed
-  (`sed 's/gho_[A-Za-z0-9]*//g'`). If a token ever appears in logs: rotate immediately
+  (`sed 's/gho_[A-Za-z0-9]*//g'`). `set -x` in a wrapper holding an inline-token URL writes the
+  live token to the log in plaintext (observed: `/root/p4_push.out`) — audit any old evidence
+  file with a pattern count (`grep -c 'gho_'`) BEFORE `cat`-ing it, and never `cat` an
+  unproven file into a tee'd inspect log. If a token ever appears in logs: rotate immediately
   (`gh auth refresh`) — everything should read the token live from `gh auth token`, so rotation
   is zero-effort.
 - Force-push ONLY as: `git push --force-with-lease=<br>:$(git ls-remote $U refs/heads/<br> | cut -f1) $U <br>`
@@ -209,6 +215,10 @@ Known rough edges:
     `Closes:` only on the completing PR, or the issue dies with the first merge. (It has fired
     for real: the aws-crt-python enabler closed the awscliv2 issue on merge — the recovery is a
     status comment on the issue pointing at the still-open completing PR, not a silent reopen.)
+    The same auto-close fires from a `Closes:` line in the **commit message** once that commit
+    reaches the default branch (caught pre-merge on macaroni-os/mark-devkit#9: the feature commit
+    said `Closes: macaroni-os/mark-issues#848` while the kit-side swap was still pending — amend
+    to `Bugs:` and lease-push before review settles).
 24. `github.match:` (package/cluster level) filters candidate versions as a regex on the
     NORMALIZED version (leading `v` already stripped — `match: '^1.*'` matches tag `v1.2026.9`
     and excludes `v8059`, proven by removing the selector and probing). Maintainer prefers it
@@ -386,6 +396,18 @@ Known rough edges:
       every PR the agent opens that day, propagation rounds included; verify after setting
       (`pulls/<n>` → `.labels`).
 
+ 40. **Aligning promoted kit ebuilds with a merged spec = a kit-repo PR in the BOT's shape**
+      (macaroni-os/core-server-kit#3448 per maintainer ask, mark-issues#848 round 2: "open a fix
+      PR in mark-unstable to align the ebuilds … in order to propagate the fix with the bot" —
+      the bot does NOT re-copy changed content under the same PV, cf. §3.38). Generate with
+      autogen-thin from the merged kit-fixups spec, deploy into the kit working copy, and file
+      the ebuild onto the kit repo's branch. Kit conventions observed: promoted manifests are
+      **DIST-only** (0 `^EBUILD` lines kit-wide; this portage's `ebuild manifest` preserves that
+      shape — a content-only fix yields an ebuild-only diff, matching the bot's own bump PRs);
+      `ebuild manifest` must run in the real git-managed kit copy (fails as `::x-root` in
+      scratch dirs). Proof bar: generated ebuilds `cmp`-identical to `/var/db/pkg/<cat>/<pn>-<pv>/<pn>.ebuild`
+      (§5.2) or to what you built; `-bin` trees regenerate byte-identical.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -418,9 +440,14 @@ Known rough edges:
 2. Fix in the meta-repo kit copy → `ebuild <file> manifest` → `emerge --quiet-build -1 =cat/pkg-ver`
    → **0 errors** → `qlist -Iv` → functional smoke (binary `--version`/`-V`, link test, upstream
    `runtests.sh`/ctest, rebuild one cheap reverse dep if <5 min).
+   **Byte-identity oracle:** portage installs the *exact* ebuild it used to
+   `/var/db/pkg/<cat>/<pn>-<pv>/<pn>.ebuild` — `cmp` a freshly generated ebuild against it to
+   prove "generated now == built back then" with no digests/binpkgs needed (§3.40 proof bar).
 3. Port the change to a kit-fixups branch → verify the **generated** ebuild via
    `mark-devkit autogen-thin --specfile autogen.kit.d/base.yml --kitfile <merge file> --pkg <PN>`
-   (PN not spec-key; `GITHUB_TOKEN` via `incus exec --env`) → check selected version, `SRC_URI`,
+   (PN not spec-key; `GITHUB_TOKEN` via `incus exec --env`; one `--pkg <PN>` run regenerates
+   ALL selector tracks of that atom — e.g. loki yields 3.7.9 + 3.6.19 — while `-bin` PNs need
+   their own run) → check selected version, `SRC_URI`,
    `post_src_unpack`/`S` → deploy generated ebuild → build again.
    **Merged-into-kit-fixups ≠ in-the-tree**: when a PR B depends on a dependency your PR A just
    added to kit-fixups, A's ebuild is NOT in the kit until the MARK bot's merge/clean phase runs
@@ -537,7 +564,10 @@ p. Cross-repo references have TWO traps. (1) Bare `#NNN` resolves **in the repo 
    formed; edit history stays visible, own the correction). Caveat found later (PR
    macaroni-os/kit-fixups#513): via `gh api --jq`, that Accept header can still return the RAW
    markdown for PR bodies and review comments — the render ground truth is graphql
-   `bodyHTML` (`pullRequest(number:N){ bodyHTML }`).
+   `bodyHTML` (`pullRequest(number:N){ bodyHTML }`). Two review-thread API quirks (2026-11-02):
+   `PullRequest` has no `reviewComments` connection — render-audit a review comment by fetching
+   its REST `node_id` and querying `node(id:)`; and a reply is GET-able only at
+   `pulls/comments/<id>` (the nested `pulls/<n>/comments/<id>` form 404s).
 q. `bash -n` is NOT a functional gate: `declare -A mod{pn,pv}` brace-expands to `modpn`/`modpv`
    — the associative arrays are silently never created, `${!mod_pn[@]}` comes back empty, the
    `IUSE+=` loops no-op, and portage then masks the ebuild (`USE flag … not in IUSE`) while every
@@ -567,6 +597,19 @@ t. **A green merge in the sandbox only proves the UNSTABLE tree** — merge-phas
    release trees the packages propagate to (macaroni-os/core-kit / lang-kit branch contents), and
    the house escape hatch used, not a version freeze: `go-module` for Go (§3.37), selector caps
    with rationale for build tools (§3.12).
+
+u. **A red CI on your PR may be repo-wide bit-rot — run control checks BEFORE touching your
+   code**: (1) do unrelated branches fail identically? dependabot PRs are the perfect control
+   group; (2) when was the base branch last green, and what hasn't changed since (runner images,
+   unpinned `go install`/deps upstream releases); (3) does the failure text reference anything in
+   your diff at all? Observed on macaroni-os/mark-devkit#9: `sudo -E env "PATH=$PATH" make deps`
+   broke when runner images started resolving sudo's HOME to /root (`go install` → /root/go/bin,
+   off PATH → Error 127 before any test ran), behind it an unpinned `go get gomega` desyncing a
+   VENDED tree (compile failures), plus a `release --clean` job triggered on `pull_request` where
+   it structurally cannot pass — all three predated the PR (same failures on a 2026-10-21
+   dependabot branch). Fixing infra inside the feature PR is acceptable when the diagnosis is
+   airtight: separate commit, local gate (`make deps` + suite) first, full disclosure in a PR
+   comment, feature code untouched.
 
 ## 8. Feedback sweep (do it between every task)
 
