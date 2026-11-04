@@ -646,6 +646,11 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    `sudo modprobe -a br_netfilter ip_tables iptable_nat xt_nat` after EVERY boot (privileged
    containers cannot auto-load; `modprobe` from inside fails `Function not implemented`).
    Docker-in-incus NAT otherwise dies with the cryptic `iptables … Table does not exist`.
+     Recreation note (2026-11-04, sandbox rebuilt from zero): the `macaroni:` simplestreams remote
+     lists `phoenix-builder` but the alias launch fails (`Image … not found`) — launch from the
+     cached fingerprint (`incus launch <fp> mfs-dev -c security.privileged=true`) and create a local
+     alias. The image has no `/root` at first boot: `mkdir /root` before the first exec that writes
+     there.
 2. **`rc=0` does not mean built**: `make build` with empty `PACKAGES`, anise-build `--all`
    (macaroni-os/anise#36), and cache-pull denials all print `warning` and may exit 0 with
    zero artifacts. Count `build/*.package.tar.zst` and match per-package ✔ lines against the
@@ -690,6 +695,15 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
      with zero spec changes — probe the fresh image first:
      `docker run --rm --entrypoint bash <image> -c 'for t in grep awk sed find gzip; do
      command -v $t \|\| echo MISSING:$t; done'`.
+   - Rotation takes more than tools: the same day's `latest-amd64` also shipped **no
+       libstdc++/libgcc_s shared libs anywhere**, while pass-1 gcc installs them only under
+       `/usr/lib/gcc/<triplet>/` — invisible to the loader, so every `g++` dies rc=127 and gmp's
+       configure fails with `C++ compiler not available`. Seed-prelude fix: write
+       `/etc/ld.so.conf.d/99-gcc-runtime.conf` + `ldconfig` (macaroni-os/macaroni-fs#3, seed `+12`)
+       — base-image runtime libs are on the "must not assume" list too. And when a maintainer says
+       an image-side fix has landed, probe the CURRENT digest (`docker pull` + file probe,
+       captured) before dropping the in-repo workaround; if the rotation doesn't carry it yet, keep
+       the seed self-sufficient and reply with the evidence (§6).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
@@ -700,4 +714,5 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    (the `+N` suffix bumps per build iteration; squash your own intermediate bumps before
    push). Issues are disabled on macaroni-fs: findings go in PR bodies, discussion on
    Discord; org attribution trailers + `Signed-off-by` apply (no `ai_ass` label there —
-   only kit-fixups defines it).
+   only kit-fixups defines it). Sync the PR body with every head push (version `+N`, evidence
+   blocks) — stale body claims land on the reviewer's desk (a "+13" body against a "+11" head).
