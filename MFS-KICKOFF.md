@@ -59,7 +59,7 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 ## Hard rules
 - Nothing runs on the host except gh/git/incus plumbing. Container does all builds. Never
   triple-quote into the container: base64-push a script (§2) — even one-liners that touch `$`.
-- Git identity in the sandbox: borisp <boris.pigin@gmail.com> — commits carry the
+- Git identity in the sandbox: use human's git name and git email — commits carry the
   `LLM-assisted-by:` + `Signed-off-by:` trailers; no `ai_ass` label (undefined in
   macaroni-fs). Token push pattern: `--env GITHUB_TOKEN` BEFORE `--`, inline-URL, output
   silenced, verify with `git ls-remote` + `pulls/<n>` head sha. No bare-#NNN refs in public
