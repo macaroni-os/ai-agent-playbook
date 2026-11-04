@@ -630,3 +630,74 @@ simplifications — §3 covers the standing versions of those asks.
 Version policies with API breaks, default-python/compiler toolchain migrations, whole new kits,
 RFC issues, package removals touching >1 kit's policy — produce evidence-rich reports and options
 instead, and let maintainers decide (they respond fast and precisely on GitHub).
+
+## 10. macaroni-fs (MFS) — stage1/stage2 spec work
+
+A different loop from kit-fixups: `macaroni-os/macaroni-fs` builds Macaroni from scratch with
+`anise-build` (luet fork) specs — plain anise YAML + Go templates, no autogen/mark-devkit.
+The `step1/` tree tracks the **LFS 13.x systemd-track book** (13.1: gcc 16.2, glibc 2.44,
+kernel 7.1.8): read `linuxfromscratch.org/lfs/view/systemd/…` — `/view/stable/` is the frozen
+SysV 12.4 book. The book drifts (rolling snapshots bump versions) — MFS pins its own.
+Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
+
+1. **Sandbox**: `macaroni/phoenix-builder` Incus container, `security.privileged=true`
+   (ships anise-build 0.45.1 + docker 24 — zero install needed). The pool is btrfs → run
+   `dockerd --storage-driver btrfs` with `/var/lib/docker` as a btrfs subvolume. Host needs
+   `sudo modprobe -a br_netfilter ip_tables iptable_nat xt_nat` after EVERY boot (privileged
+   containers cannot auto-load; `modprobe` from inside fails `Function not implemented`).
+   Docker-in-incus NAT otherwise dies with the cryptic `iptables … Table does not exist`.
+2. **`rc=0` does not mean built**: `make build` with empty `PACKAGES`, anise-build `--all`
+   (macaroni-os/anise#36), and cache-pull denials all print `warning` and may exit 0 with
+   zero artifacts. Count `build/*.package.tar.zst` and match per-package ✔ lines against the
+   DAG size before believing any run. Use `BACKEND=docker REPO_CACHE=` — the Makefile's
+   `dockerv3` default is rejected by released anise-build.
+3. **CI (`make validate`) only parses specs — it NEVER executes steps.** Every functional
+   claim must come from a local full-chain `make build` + payload smoke. Verification
+   standard: rebuild the whole chain from the seed at final head, then run built binaries
+   via the SYSROOT loader: `/mfs/usr/lib/ld-linux-x86-64.so.2 --inhibit-cache
+   --library-path /mfs/usr/lib <bin> --version`. A target-tool `GLIBC_2.xx not found` on the
+   sandbox ROOT is an old-host artifact — re-check inside the current env image before
+   filing it as a bug.
+4. **Layer model**: each package builds FROM the dependency closure's cache image; the local
+   docker daemon holds them, so tail-of-chain iterations cost minutes, full chain ~2 h.
+   Any seed change cascades everything. `REPO_CACHE=` keeps pushes out of
+   `macaronios/mfs-anise-cache`.
+5. **House spec pattern (double install)**: live `make DESTDIR=${MFS} install` + payload
+   `make DESTDIR=/step1/<pn>${MFS} install`, `package_dir: /step1/<pn>/mfs`. Anything the
+   build fixes post-install (compat symlinks, seds) must be applied to BOTH trees.
+   Vendored patches live in the package dir and arrive injected at `/anisebuild/` — stage
+   them into `${MFS}/sources/patches/` (maintainer architecture: a future `step1/sources`
+   capture package ships them to step2 so nothing re-vendors; PR #2 review).
+6. **YAML float trap**: quote two-segment versions (`version: '6.6'`, label `'5.3'`) in
+   both definition fields or they parse as numbers.
+7. **Toolchain landmines (PR #3, check before blaming a new spec)**:
+   - pass-1 `--with-newlib` gcc installs the BOOT `limits.h` (`MB_LEN_MAX 1`, no
+     `include_next`); glibc ≥2.42 + GCC-16 default C23 auto-fortify then kills every
+     gnulib package with `Assumed value of MB_LEN_MAX wrong` in `bits/stdlib.h`. Fix:
+     proper wrapper — `include_next` the C library first (its values win), then
+     `glimits.h` for compiler macros. The pass-1 driver also omits libstdc++ headers
+     entirely → pass `-isystem $GXXD…` INSIDE `CXX=` (not CXXFLAGS) so `CXXCPP` sees them
+     too (autoconf header probes otherwise take legacy `#include <iostream.h>` paths).
+   - Build-machine tools: `PATH` puts cross gcc at bare `gcc` first → always pin
+     `CC_FOR_BUILD=/usr/bin/gcc` (bash's mkbuiltins links against the sysroot libc and
+     cannot run) and ncurses needs explicit `--with-build-cc/--with-build-cxx`.
+   - ncurses' own g++ probe hardcodes `-I/usr/include` against the build container's old
+     floatn.h → `-fpermissive` demotes the `_FloatNN` builtin-collision errors.
+   - The seed must not assume base-image contents: `terragon-minimal-devel:latest-amd64`
+     rotates daily (one shipped no grep/gawk/find/gzip + a dangling `/usr/bin/awk` that
+     broke virtual/base's finalizer). Seed lists everything explicitly; non-load-bearing
+     anise calls get `eval '… || true'` (house style). `--pull` means the chain can break
+     with zero spec changes — probe the fresh image first:
+     `docker run --rm --entrypoint bash <image> -c 'for t in grep awk sed find gzip; do
+     command -v $t \|\| echo MISSING:$t; done'`.
+8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
+   repro attempts produced three contradictory m4 results; one throwaway container per
+   hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
+   binary misbehaves, dump its config.log section (`-I` flags!) before theorizing —
+   `-I/usr/include` was the whole ncurses story.
+9. **Maintainer flow**: geaaru reviews fast, pushes seeds/specs himself between your PRs —
+   always `git fetch upstream` + rebase before pushing, and expect seed version collisions
+   (the `+N` suffix bumps per build iteration; squash your own intermediate bumps before
+   push). Issues are disabled on macaroni-fs: findings go in PR bodies, discussion on
+   Discord; org attribution trailers + `Signed-off-by` apply (no `ai_ass` label there —
+   only kit-fixups defines it).

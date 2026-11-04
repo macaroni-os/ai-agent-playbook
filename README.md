@@ -11,7 +11,7 @@ the conventions the maintainers actually asked for.
 ## Contents
 | file | what |
 |---|---|
-| [PLAYBOOK.md](PLAYBOOK.md) | the full playbook: sandbox setup, maintainer conventions, fix-pattern table, verification standard, subagent operating model, known agent failure modes |
+| [PLAYBOOK.md](PLAYBOOK.md) | the full playbook: sandbox setup, maintainer conventions, fix-pattern table, verification standard, subagent operating model, known agent failure modes, macaroni-fs stage1/stage2 spec work (§10) |
 | [KICKOFF.md](KICKOFF.md) | short prompt to hand a fresh agent session so it boots the loop from the playbook |
 
 ## Quick start
