@@ -8,28 +8,31 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   human). Privileged, image `macaroni/phoenix-builder`: remote-alias launch is broken
   (simplestreams), launch from cached fingerprint `97018cb46620` / local alias
   `phoenix-builder`; the image has NO `/root` — mkdir first. Snapshots: clean-base,
-  repo-ready, docker-ready, cross-tools-green.
+  repo-ready, docker-ready, cross-tools-green, cross-tools-green-r2, cross-tools-green-r3.
   dockerd runs with `--storage-driver btrfs` and DOES NOT survive container restarts;
   netfilter modules die on host reboot — if dockerd fails with "Table does not exist",
   ask the human to run:
   `sudo sh -c 'modprobe -a br_netfilter ip_tables iptable_nat xt_nat'`.
-- Repo: `/root/macaroni-fs`, branch `step1-cross-tools`, HEAD `4ffb638`; remotes
+- Repo: `/root/macaroni-fs`, branch `step1-cross-tools`, HEAD `e177157`; remotes
   `upstream` (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
   Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
   — always verify artifacts (rc=0 lies, §10.2/§7 class).
-- macaroni-os/macaroni-fs: PR #1/#2 MERGED, **PR #3 OPEN** — head `4ffb638`: gcc limits.h
-  wrapper, step1/m4, ncurses, bash, seeds/builder self-contained (+11), seed GCC-runtime
-  prelude (+12). Both geaaru review threads answered with captured evidence and RESOLVED
-  (2026-11-04); PR body carries a fresh 13/13 clean-slate verification (`docker system
-  prune`, seed base digest `sha256:ea4a393c…`). Awaiting re-review.
-- macaroni-os/ai-agent-playbook: PR #11 MERGED; **this file is tracked now — refresh it at
-  the end of every session** (that's the whole point; /tmp drafts died on reboots before).
+- macaroni-os/macaroni-fs: PR #1/#2 MERGED, **PR #3 OPEN** — head `e177157` (seed `+14`):
+  gcc limits.h wrapper, step1/m4, ncurses, bash, self-contained tool list (+11), and the
+  review-round arc +12→+14: GCC-runtime prelude added→canonicalized→DROPPED (the terragon
+  image `sha256:ea4a393c…` shipped the conf all along; the real failure was `/tmp` missing
+  before `gcc-config` — guard hoisted, `virtual/base` dropped per maintainer). Three review
+  rounds answered; all 4 threads resolved (2026-11-04); body carries the +14 13/13
+  clean-slate verification incl. `whip h linking.check`. Awaiting re-review.
+- macaroni-os/ai-agent-playbook: PR #11 MERGED, PR #12 OPEN (this file + §10 rotation lessons);
+  **refresh this file at the end of every session** (that's the whole point; /tmp drafts died on
+  reboots before).
 - macaroni-os/anise#36 OPEN — answered 2026-11-04 with captured `anise-repo-devkit`
   evidence; geaaru is UNDECIDED between `--all-pkgs-tree` and leaving it — watch the thread,
   don't build on `--all`.
-- Seed probe before EVERY chain run (§10.7 recipe): today's terragon `latest-amd64` lacks
-  grep/awk/find/gzip AND all libstdc++/libgcc_s; the +12 seed handles both — still trust
-  the seed, never the image.
+- Seed probe before EVERY chain run (§10.7 recipe): rotation content changes without any spec
+  change; the +14 seed + current image cover tools, GCC conf and /tmp — still trust the seed,
+  never the image, and add `whip h linking.check` to the post-chain battery.
 
 ## Task order
 1. §8 sweep FIRST — all three endpoints (`issues/N/comments`, `pulls/N/comments`,

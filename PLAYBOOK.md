@@ -662,7 +662,9 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    via the SYSROOT loader: `/mfs/usr/lib/ld-linux-x86-64.so.2 --inhibit-cache
    --library-path /mfs/usr/lib <bin> --version`. A target-tool `GLIBC_2.xx not found` on the
    sandbox ROOT is an old-host artifact — re-check inside the current env image before
-   filing it as a bug.
+   filing it as a bug. Maintainer-endorsed rootfs link audit (since 2026-11-04, run on every
+   fresh seed): `whip h linking.check` — walks `/usr/lib*`, `/usr/bin`, `/bin`, `/usr/sbin`,
+   `/usr/libexec` and ends `[linking.check] Completed correctly.` (whip ships in the builder seed).
 4. **Layer model**: each package builds FROM the dependency closure's cache image; the local
    docker daemon holds them, so tail-of-chain iterations cost minutes, full chain ~2 h.
    Any seed change cascades everything. `REPO_CACHE=` keeps pushes out of
@@ -704,6 +706,14 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
        an image-side fix has landed, probe the CURRENT digest (`docker pull` + file probe,
        captured) before dropping the in-repo workaround; if the rotation doesn't carry it yet, keep
        the seed self-sufficient and reply with the evidence (§6).
+    - The `/tmp` guard belongs BEFORE `gcc-config` — it is the consumer, and its absence broke
+      the toolchain while the guard sat at the END of the seed prelude (geaaru's diagnosis of the
+      failure round 1 misattributed to a "missing 05gcc conf" the image in fact already shipped:
+      `eval 'mkdir /tmp || true' && chmod a+rwx /tmp` early in the prelude, macaroni-os/macaroni-fs#3
+      `+14`, real fix pending terragon-side). Root-cause humility: a rotation probe proves the
+      symptom, the maintainer can reframe the cause — re-test attribution after each fix and drop
+      workarounds written for hypotheses that don't survive (the `printf` conf prelude died in the
+      same commit that hoisted the guard).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
