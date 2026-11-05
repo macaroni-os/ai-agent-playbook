@@ -5,9 +5,8 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 
 ## Board state (verify all of it live before acting — it moves daily)
 - Sandbox: Incus container `mfs-dev` — RECREATED clean 2026-11-04 (old one deleted by the
-  human). Privileged, image `macaroni/phoenix-builder`: remote-alias launch is broken
-  (simplestreams), launch from cached fingerprint `97018cb46620` / local alias
-  `phoenix-builder`; the image has NO `/root` — mkdir first. Snapshots: clean-base,
+  human). Privileged, image `macaroni/phoenix-builder` — plain alias launch works
+  (re-verified 2026-11-05); the image has NO `/root` — mkdir first. Snapshots: clean-base,
   repo-ready, docker-ready, cross-tools-green, cross-tools-green-r2, cross-tools-green-r3.
   dockerd runs with `--storage-driver btrfs` and DOES NOT survive container restarts;
   netfilter modules die on host reboot — if dockerd fails with "Table does not exist",

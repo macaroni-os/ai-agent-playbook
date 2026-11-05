@@ -646,11 +646,10 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    `sudo modprobe -a br_netfilter ip_tables iptable_nat xt_nat` after EVERY boot (privileged
    containers cannot auto-load; `modprobe` from inside fails `Function not implemented`).
    Docker-in-incus NAT otherwise dies with the cryptic `iptables … Table does not exist`.
-     Recreation note (2026-11-04, sandbox rebuilt from zero): the `macaroni:` simplestreams remote
-     lists `phoenix-builder` but the alias launch fails (`Image … not found`) — launch from the
-     cached fingerprint (`incus launch <fp> mfs-dev -c security.privileged=true`) and create a local
-     alias. The image has no `/root` at first boot: `mkdir /root` before the first exec that writes
-     there.
+     Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
+     works plain — the 2026-11-04 `Image … not found` was transient, the fingerprint workaround is
+     dropped per maintainer. The image has no `/root` at first boot: `mkdir /root` before the first
+     exec that writes there.
 2. **`rc=0` does not mean built**: `make build` with empty `PACKAGES`, anise-build `--all`
    (macaroni-os/anise#36), and cache-pull denials all print `warning` and may exit 0 with
    zero artifacts. Count `build/*.package.tar.zst` and match per-package ✔ lines against the
