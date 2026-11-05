@@ -642,10 +642,16 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
 
 1. **Sandbox**: `macaroni/phoenix-builder` Incus container, `security.privileged=true`
    (ships anise-build 0.45.1 + docker 24 — zero install needed). The pool is btrfs → run
-   `dockerd --storage-driver btrfs` with `/var/lib/docker` as a btrfs subvolume. Host needs
-   `sudo modprobe -a br_netfilter ip_tables iptable_nat xt_nat` after EVERY boot (privileged
-   containers cannot auto-load; `modprobe` from inside fails `Function not implemented`).
-   Docker-in-incus NAT otherwise dies with the cryptic `iptables … Table does not exist`.
+   `dockerd --storage-driver btrfs` with `/var/lib/docker` as a btrfs subvolume. Declare the
+   netfilter prerequisites on the Incus side — maintainer recipe (macaroni-os/ai-agent-playbook#12):
+   a `docker` profile with `security.nesting=true` plus `linux.kernel_modules:
+   ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter` — incusd runs `modprobe -b <mod>`
+   for every entry at each container start (verified 2026-11-05: an entry absent from the host
+   kernel aborts the launch with `Failed to load kernel module 'xt_stat'…`), so the modules follow
+   the container, not the boot — keep the list matched to the host kernel. Manual
+   `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
+   `Function not implemented`); without the modules, Docker-in-incus NAT dies with the cryptic
+   `iptables … Table does not exist`.
      Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
      works plain — the 2026-11-04 `Image … not found` was transient, the fingerprint workaround is
      dropped per maintainer. The image has no `/root` at first boot: `mkdir /root` before the first

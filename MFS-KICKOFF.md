@@ -8,10 +8,12 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   human). Privileged, image `macaroni/phoenix-builder` — plain alias launch works
   (re-verified 2026-11-05); the image has NO `/root` — mkdir first. Snapshots: clean-base,
   repo-ready, docker-ready, cross-tools-green, cross-tools-green-r2, cross-tools-green-r3.
-  dockerd runs with `--storage-driver btrfs` and DOES NOT survive container restarts;
-  netfilter modules die on host reboot — if dockerd fails with "Table does not exist",
-  ask the human to run:
-  `sudo sh -c 'modprobe -a br_netfilter ip_tables iptable_nat xt_nat'`.
+  dockerd runs with `--storage-driver btrfs` and DOES NOT survive container restarts.
+  Netfilter modules: `mfs-dev` carries a `docker` Incus profile (`security.nesting=true` +
+  `linux.kernel_modules: ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter`,
+  maintainer recipe macaroni-os/ai-agent-playbook#12) — incusd modprobes them at every
+  container start; only if a launch itself fails with `Failed to load kernel module …`
+  (module missing from the host kernel), ask the human about the host kernel/modules.
 - Repo: `/root/macaroni-fs`, branch `step1-cross-tools`, HEAD `e177157`; remotes
   `upstream` (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
   Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
