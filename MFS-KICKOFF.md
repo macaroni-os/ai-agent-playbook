@@ -1,4 +1,4 @@
-# MFS loop — session handoff (2026-11-06, fourth refresh)
+# MFS loop — session handoff (2026-11-06, fifth refresh — PR #5/#6 merged)
 
 Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply as written
 (§2–§4 and the kit-fixups parts of §7 do NOT apply to macaroni-fs). Then:
@@ -18,20 +18,26 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   failing with `Failed to load kernel module …`. Do not add `xt_stat`: it is not a module
   in this kernel (7.2.15-1-omarchy) and a literal entry aborts every launch of the
   instance (`modprobe: FATAL: Module xt_stat not found`); the six-entry list is enough.
-- Repo: `/root/macaroni-fs`, branch `step1-ch6-tools-2`, HEAD `4d3ad3f` (6 commits on
-  top of merged master `d50cac4`); remotes `upstream` (macaroni-os/macaroni-fs) +
-  `fork` (org-tekeli-borisp/macaroni-fs). Build invocation:
-  `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
+- Isolated build sandbox: **`mfs-build`** (unprivileged, `default` + `docker` profile,
+  own btrfs daemon) — created 2026-11-06 because a second agent session shares `mfs-dev`
+  and swaps its daemon (XFS/btrfs benchmarks), killing in-flight builds. Snapshot
+  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain) and `step1-pass2-green`
+  (clean 26/26 through gcc-pass2). Use `mfs-build` for macaroni-fs
+  builds; leave `mfs-dev` to the other session.
+- Repo: `/root/macaroni-fs`, master `7ddee9a` (PR #6 merge); active branch
+  `step1-pass2`, HEAD `311ee7b` (two commits on `7ddee9a`). Remotes
+  `upstream` (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
+  Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
   — always verify artifacts (rc=0 lies, §10.2/§7 class).
-- macaroni-os/macaroni-fs: PR #1/#2/#3/#4 MERGED (PR #4 as `d50cac4`, 2026-11-05);
-  **PR #5 OPEN** — head `4d3ad3f`
-  (https://github.com/macaroni-os/macaroni-fs/pull/5): ch.6 gzip 1.15, make 4.4.1,
-  patch 2.8.1, sed 4.10, tar 1.35, xz 5.8.4; six commits, one per package; body
-  carries the clean-slate 24/24 chain + loader smoke + `whip` evidence. Awaiting
-  review.
-- macaroni-os/ai-agent-playbook: PR #11 MERGED, PR #12 OPEN (this file + §10 cache
-  and MAKEOPTS lessons) — this refresh rides it. Refresh this file at the end of every
-  session; /tmp drafts die on reboots.
+- macaroni-os/macaroni-fs: PR #1–#6 MERGED (PR #4 `d50cac4`, PR #5 `e7bd201`,
+  PR #6 `7ddee9a`, 2026-11-06). **PR #7 OPEN** — head `311ee7b`
+  (https://github.com/macaroni-os/macaroni-fs/pull/7): `step1/binutils-pass2`
+  (2.46.0) and `step1/gcc-pass2` (16.2.0); clean 26/26 chain plus a real chroot
+  C and C++ compile/run, `whip` green. Open questions in the body: binutils
+  2.47 book drift, `coreutils` 6.5 gap, empty `/usr/lib64` from base.
+- macaroni-os/ai-agent-playbook: PR #11/#12 MERGED; **PR #13 OPEN** carries this
+  handoff refresh (branch `mfs-handoff`, head after the pass-2 refresh commit).
+  Refresh this file at the end of every session; /tmp drafts die on reboots.
 - macaroni-os/anise#36 OPEN — maintainer undecided between `--all-pkgs-tree` and
   leaving it; watch the thread, don't build on `--all`.
 - Rotation probe before EVERY chain run (§10.7 recipe): base image
@@ -48,10 +54,13 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   digest actually used. Reusing the cache is fine for quick spec iteration only.
 - **MAKEOPTS lesson**: the support from macaroni-os/macaroni-fs commit `84af51a`
   is inert as merged — the specs export `MAKEOPTS`, but the calls are plain `make`
-  and GNU make reads `MAKEFLAGS`, not `MAKEOPTS`. Verified 2026-11-06:
-  `MAKEFLAGS=[]` with `MAKEOPTS=-j4`; gcc pass-1's `RUN` step still took 2066.5 s
-  with the export in place. Evidence + proposed `make ${MAKEOPTS}` fix are in a
-  comment on PR #5. Wait for geaaru's call before changing the toolchain specs.
+  and GNU make reads `MAKEFLAGS`, not `MAKEOPTS`. geaaru asked for a specific PR;
+  it is macaroni-os/macaroni-fs#6, merged as `7ddee9a`. Verified on a clean 24/24
+  chain: gcc pass-1
+  2066.5 s → 236.2 s, glibc 102.8 s → 17.6 s, libstdcxx 100.4 s → 49.7 s; sum over
+  all packages 3297.4 s → 1352.5 s. gcc needed its goals split (`all-gcc` before
+  `all-target-libgcc`): under a real `-j` the combined invocation races
+  `libgcc/configure` against the not-yet-built `gcc/xgcc`.
 - **Docker storage driver**: XFS + overlay2 was built and BENCHMARKED 2026-11-06
   (loopback shape, see §10.1): it works (`xfs_info` `ftype=1`, docker info
   `Backing Filesystem: xfs` / `Supports d_type: true`) but is **not faster** than the btrfs
@@ -64,26 +73,21 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   module, hotplugged loop nodes for loopback) are recorded in §10.1.
 
 ## Task order
-1. §8 sweep FIRST — all three endpoints (`issues/N/comments`, `pulls/N/comments`,
-   `pulls/N/reviews`) on PR #5 (and PR #12), plus upstream master drift
-   (`git fetch upstream` in the sandbox; geaaru pushes seeds/specs directly —
-   rebase before any push).
-2. When PR #5 is reviewed: implement the ask or reply with a probe (§6
-   both-end-state style). Open items for geaaru: the MAKEOPTS fix and the
-   still-unanswered `coreutils` 6.5 gap before diffutils in the book order.
-3. After PR #5 merges (or geaaru says go): next tools are **binutils-pass2** and
-   **gcc-pass2** (the `-pass2` naming is agreed). Pull exact versions/procedures
-   from linuxfromscratch.org `/lfs/view/systemd/` (rolling — do NOT trust
-   `/view/stable/`, SysV 12.4); remember binutils/gcc pass-2 install under
-   `${MFS}/usr` in 13.x. Full-chain build + loader smoke remain the verification
-   bar, one commit per package with the attribution trailers.
-4. If geaaru accepts the MAKEOPTS finding: small follow-up (or fold-in) changing
-   the gcc/glibc/libstdcxx `make` calls to `make ${MAKEOPTS}`, with before/after
-   timing on the same host and a re-verified chain.
-5. After the tool list is complete: `step1/sources` capture package at the END of
-   step1 (package_dir `${MFS}/sources`, requires the full step1 set) — ask whether
-   it rides the last tools PR or lands alone.
-6. Beyond ch.6 (ch.7 equivalents, step2/): structural decisions — propose with
+1. §8 sweep FIRST — upstream master drift (`git fetch upstream` in the sandbox;
+   geaaru pushes seeds/specs directly — rebase before any push) and any new review
+   activity on the just-merged PR #5/#6 or open PR #7. All three endpoints, always.
+2. PR #7 carries the pass-2 tools; when reviewed, implement the ask or reply with a
+   probe (§6 both-end-state style). Open questions in the body: binutils 2.46 vs the
+   book's 2.47 (parity vs bump-both), the `coreutils` 6.5 gap, and the empty
+   `/usr/lib64` still created by `step1/base`.
+3. After PR #7 merges: ch.6 is complete. Next is the ch.7 territory — enter-chroot
+   structure and the additional temporary tools — plus the structural step2/
+   decisions; pull exact procedures from the rolling book and propose in PR comments
+   (§9). Then close the loop with `step1/sources` (package_dir `${MFS}/sources`,
+   requires the full step1 set; ask whether it rides the last tools PR or lands alone).
+4. Nothing further for MAKEOPTS unless geaaru asks; keep the default `-j$(nproc)`
+   (override via `.Values.makeopts`) and re-measure if the host core count changes.
+5. Beyond ch.6 (ch.7 equivalents, step2/): structural decisions — propose with
    evidence in PR comments and let geaaru decide (§9).
 
 ## Hard rules
