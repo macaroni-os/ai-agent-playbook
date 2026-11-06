@@ -770,8 +770,11 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
       `export MAKEOPTS="-j$(nproc)"` is inert while the calls stay plain `make` (verified
       2026-11-06: `$(MAKEFLAGS)` stays empty, and gcc pass-1's `RUN` step still took 2066.5 s
       with the export in place). The value only reaches make via `make ${MAKEOPTS}` or by
-      exporting `MAKEFLAGS`; raised with the maintainer, with the one-line fix, on
-      macaroni-os/macaroni-fs#5.
+      exporting `MAKEFLAGS`. Fixed in macaroni-os/macaroni-fs#6: gcc, glibc and libstdcxx pass
+      `${MAKEOPTS}` now; measured on a clean 24/24 chain, gcc 2066.5→236.2 s, glibc
+      102.8→17.6 s, libstdcxx 100.4→49.7 s. GCC needs its goals split (`all-gcc` before
+      `all-target-libgcc`): a real `-j` otherwise races libgcc's configure against the
+      not-yet-built `xgcc` (`No such file or directory .../gcc/xgcc`).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
