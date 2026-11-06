@@ -775,6 +775,20 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
       102.8→17.6 s, libstdcxx 100.4→49.7 s. GCC needs its goals split (`all-gcc` before
       `all-target-libgcc`): a real `-j` otherwise races libgcc's configure against the
       not-yet-built `xgcc` (`No such file or directory .../gcc/xgcc`).
+    - **Pass-2 toolchain landmines (verified 2026-11-06, macaroni-os/macaroni-fs#7)**:
+      pass-1 binutils installs target tools *unprefixed* under
+      `cross-tools/$TGT/bin` (the `$TGT-ar` names do not exist), so pass-2 configures
+      fail `could not determine $TGT-ar` — export
+      `AR/AS/LD/NM/RANLIB/STRIP/OBJCOPY/OBJDUMP/READELF` from there. The unprefixed
+      `g++` first on PATH is the headerless pass-1 cross compiler and kills GCC's
+      libcody (`fatal error: memory: No such file or directory`) — pin `CC`/`CXX` (and
+      `*_FOR_BUILD`) to `/usr/bin`. A seed zstd leaks into the installed `cc1`
+      (`libzstd.so.1: cannot open shared object file` in the chroot) — configure
+      `--without-zstd`. The book's `m64=../lib` sed does not stop GCC's target libs
+      (incl. `libgcc_s.so.1`) from landing in `${MFS}/usr/lib64` while the driver
+      searches `/usr/lib` — consolidate into `/usr/lib` and drop `/usr/lib64` from the
+      staged trees. Proof bar: a real chroot C **and** C++ compile+run (add a test-only
+      `/lib/ld-linux-x86-64.so.2` link because the loader lives in `/usr/lib`).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain

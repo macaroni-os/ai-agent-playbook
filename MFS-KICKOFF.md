@@ -21,22 +21,23 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 - Isolated build sandbox: **`mfs-build`** (unprivileged, `default` + `docker` profile,
   own btrfs daemon) — created 2026-11-06 because a second agent session shares `mfs-dev`
   and swaps its daemon (XFS/btrfs benchmarks), killing in-flight builds. Snapshot
-  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain). Use `mfs-build` for macaroni-fs
+  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain) and `step1-pass2-green`
+  (clean 26/26 through gcc-pass2). Use `mfs-build` for macaroni-fs
   builds; leave `mfs-dev` to the other session.
-- Repo: `/root/macaroni-fs`, master `7ddee9a` (PR #6 merge); the working branch
-  `step1-makeopts` (`49ab045`) is now merged and stale. An identical checkout is in
-  `mfs-build`. Remotes `upstream` (macaroni-os/macaroni-fs) + `fork`
-  (org-tekeli-borisp/macaroni-fs). Build invocation:
-  `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
+- Repo: `/root/macaroni-fs`, master `7ddee9a` (PR #6 merge); active branch
+  `step1-pass2`, HEAD `311ee7b` (two commits on `7ddee9a`). Remotes
+  `upstream` (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
+  Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
   — always verify artifacts (rc=0 lies, §10.2/§7 class).
 - macaroni-os/macaroni-fs: PR #1–#6 MERGED (PR #4 `d50cac4`, PR #5 `e7bd201`,
-  PR #6 `7ddee9a`, 2026-11-06). PR #6 passed `MAKEOPTS` to make in gcc/glibc/libstdcxx
-  and split gcc's build/install goals so `-j` cannot race libgcc against the
-  not-yet-built `xgcc`; clean 24/24 chain with gcc 2066.5→236.2 s, glibc
-  102.8→17.6 s, libstdcxx 100.4→49.7 s.
-- macaroni-os/ai-agent-playbook: PR #11 and PR #12 MERGED (PR #12 as `95e7f5e`);
-  this handoff refresh is a new PR on a fresh branch. Refresh this file at the end of
-  every session; /tmp drafts die on reboots.
+  PR #6 `7ddee9a`, 2026-11-06). **PR #7 OPEN** — head `311ee7b`
+  (https://github.com/macaroni-os/macaroni-fs/pull/7): `step1/binutils-pass2`
+  (2.46.0) and `step1/gcc-pass2` (16.2.0); clean 26/26 chain plus a real chroot
+  C and C++ compile/run, `whip` green. Open questions in the body: binutils
+  2.47 book drift, `coreutils` 6.5 gap, empty `/usr/lib64` from base.
+- macaroni-os/ai-agent-playbook: PR #11/#12 MERGED; **PR #13 OPEN** carries this
+  handoff refresh (branch `mfs-handoff`, head after the pass-2 refresh commit).
+  Refresh this file at the end of every session; /tmp drafts die on reboots.
 - macaroni-os/anise#36 OPEN — maintainer undecided between `--all-pkgs-tree` and
   leaving it; watch the thread, don't build on `--all`.
 - Rotation probe before EVERY chain run (§10.7 recipe): base image
@@ -73,21 +74,20 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 
 ## Task order
 1. §8 sweep FIRST — upstream master drift (`git fetch upstream` in the sandbox;
-   geaaru pushes seeds/specs directly — rebase before any push) and any post-merge
-   review activity on the just-merged PR #5 / PR #6. All three endpoints, always.
-2. Next tools: **binutils-pass2** and **gcc-pass2** (the `-pass2` naming is agreed).
-   Pull exact versions/procedures from linuxfromscratch.org `/lfs/view/systemd/`
-   (rolling — do NOT trust `/view/stable/`, SysV 12.4); remember binutils/gcc pass-2
-   install under `${MFS}/usr` in 13.x. Full-chain build + loader smoke remain the
-   verification bar, one commit per package with the attribution trailers.
-   Still unanswered for geaaru: the `coreutils` 6.5 gap before diffutils in the book
-   order — decide before the tool list closes.
-3. Nothing further for MAKEOPTS unless geaaru asks; keep the default `-j$(nproc)`
+   geaaru pushes seeds/specs directly — rebase before any push) and any new review
+   activity on the just-merged PR #5/#6 or open PR #7. All three endpoints, always.
+2. PR #7 carries the pass-2 tools; when reviewed, implement the ask or reply with a
+   probe (§6 both-end-state style). Open questions in the body: binutils 2.46 vs the
+   book's 2.47 (parity vs bump-both), the `coreutils` 6.5 gap, and the empty
+   `/usr/lib64` still created by `step1/base`.
+3. After PR #7 merges: ch.6 is complete. Next is the ch.7 territory — enter-chroot
+   structure and the additional temporary tools — plus the structural step2/
+   decisions; pull exact procedures from the rolling book and propose in PR comments
+   (§9). Then close the loop with `step1/sources` (package_dir `${MFS}/sources`,
+   requires the full step1 set; ask whether it rides the last tools PR or lands alone).
+4. Nothing further for MAKEOPTS unless geaaru asks; keep the default `-j$(nproc)`
    (override via `.Values.makeopts`) and re-measure if the host core count changes.
-4. After the tool list is complete: `step1/sources` capture package at the END of
-   step1 (package_dir `${MFS}/sources`, requires the full step1 set) — ask whether
-   it rides the last tools PR or lands alone.
-6. Beyond ch.6 (ch.7 equivalents, step2/): structural decisions — propose with
+5. Beyond ch.6 (ch.7 equivalents, step2/): structural decisions — propose with
    evidence in PR comments and let geaaru decide (§9).
 
 ## Hard rules
