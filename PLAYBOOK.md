@@ -661,7 +661,11 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    (macaroni-os/anise#36), and cache-pull denials all print `warning` and may exit 0 with
    zero artifacts. Count `build/*.package.tar.zst` and match per-package ✔ lines against the
    DAG size before believing any run. Use `BACKEND=docker REPO_CACHE=` — the Makefile's
-   `dockerv3` default is rejected by released anise-build.
+   `dockerv3` default is rejected by released anise-build. `--pull` does NOT invalidate local
+   cache images: anise-build reuses `anise-build/cache:*` when the spec/tree hash matches, even
+   after the base image rotates (verified 2026-11-05 — a chain run silently verified the old
+   rotation). Run `docker system prune --all --volumes -f` before any clean-slate claim and quote
+   the base-image digest actually used.
 3. **CI (`make validate`) only parses specs — it NEVER executes steps.** Every functional
    claim must come from a local full-chain `make build` + payload smoke. Verification
    standard: rebuild the whole chain from the seed at final head, then run built binaries
@@ -720,6 +724,12 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
       symptom, the maintainer can reframe the cause — re-test attribution after each fix and drop
       workarounds written for hypotheses that don't survive (the `printf` conf prelude died in the
       same commit that hoisted the guard).
+    - **`MAKEOPTS` is not read by GNU make.** A spec-level
+      `export MAKEOPTS="-j$(nproc)"` is inert while the calls stay plain `make` (verified
+      2026-11-06: `$(MAKEFLAGS)` stays empty, and gcc pass-1's `RUN` step still took 2066.5 s
+      with the export in place). The value only reaches make via `make ${MAKEOPTS}` or by
+      exporting `MAKEFLAGS`; raised with the maintainer, with the one-line fix, on
+      macaroni-os/macaroni-fs#5.
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
