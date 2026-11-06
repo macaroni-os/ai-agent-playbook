@@ -52,16 +52,16 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   `MAKEFLAGS=[]` with `MAKEOPTS=-j4`; gcc pass-1's `RUN` step still took 2066.5 s
   with the export in place. Evidence + proposed `make ${MAKEOPTS}` fix are in a
   comment on PR #5. Wait for geaaru's call before changing the toolchain specs.
-- **Docker storage driver**: XFS + overlay2 is now the working setup on `mfs-dev`
-  (verified 2026-11-06; faster than the btrfs driver). The operator added
-  `loop-control` / `loop0` / `loop1` unix devices to the container; inside,
-  `/dev/loop0` is an XFS image mounted at `/xfs-docker` (`ftype=1`) and dockerd runs
-  `--data-root /xfs-docker/docker --storage-driver overlay2`. Captured:
-  `Storage Driver: overlay2`, `Backing Filesystem: xfs`, and
-  `docker run --rm busybox echo XFS-OVERLAY-NET-OK` passes. The loop mount and
-  dockerd do NOT survive container restarts (re-create both; xfsprogs is installed
-  in the container). For future unprivileged containers use a host XFS mount plus an
-  Incus disk device instead of the in-container loop.
+- **Docker storage driver**: XFS + overlay2 was built and BENCHMARKED 2026-11-06
+  (loopback shape, see §10.1): it works (`xfs_info` `ftype=1`, docker info
+  `Backing Filesystem: xfs` / `Supports d_type: true`) but is **not faster** than the btrfs
+  driver on this host — pulls and small-file churn are a wash, the synthetic layered build
+  ran 1.7–4.5x slower on loop-XFS. Live shape on `mfs-dev` is the original
+  `dockerd --storage-driver btrfs` on `/var/lib/docker`; the test loop devices, the
+  `/xfs-docker` mount and the per-instance `linux.kernel_modules` were removed again.
+  The maintainer's real-partition claim stays open (single LUKS/btrfs disk here): the
+  production device-add shape and both prerequisites (`linux.kernel_modules xfs` for the
+  module, hotplugged loop nodes for loopback) are recorded in §10.1.
 
 ## Task order
 1. §8 sweep FIRST — all three endpoints (`issues/N/comments`, `pulls/N/comments`,
