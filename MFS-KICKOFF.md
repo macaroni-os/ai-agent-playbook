@@ -4,15 +4,20 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 (§2–§4 and the kit-fixups parts of §7 do NOT apply to macaroni-fs). Then:
 
 ## Board state (verify all of it live before acting — it moves daily)
-- Sandbox: Incus container `mfs-dev` — privileged, image `macaroni/phoenix-builder`;
-  plain alias launch works, and the image has NO `/root` (mkdir first). Snapshots:
+- Sandbox: Incus container `mfs-dev` — image `macaroni/phoenix-builder`, created with
+  `security.privileged=true` on 2026-11-04, but **privileged is NOT required** (verified
+  2026-11-06: an unprivileged throwaway with only the `docker` profile ran
+  `dockerd --storage-driver btrfs` and a NAT container; recreate `mfs-dev` unprivileged when
+  convenient). Plain alias launch works, and the image has NO `/root` (mkdir first). Snapshots:
   clean-base, repo-ready, docker-ready, cross-tools-green, cross-tools-green-r2,
   cross-tools-green-r3, step1-ch6-green, **step1-ch6b-green** (2026-11-06, after the
   clean 24/24 chain). dockerd runs with `--storage-driver btrfs` and DOES NOT survive
   container restarts. The `docker` Incus profile carries `security.nesting=true` +
   `linux.kernel_modules: ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter`;
   incusd modprobes them at every start. A host-kernel gap only shows up as a launch
-  failing with `Failed to load kernel module …`.
+  failing with `Failed to load kernel module …`. Do not add `xt_stat`: it is not a module
+  in this kernel (7.2.15-1-omarchy) and a literal entry aborts every launch of the
+  instance (`modprobe: FATAL: Module xt_stat not found`); the six-entry list is enough.
 - Repo: `/root/macaroni-fs`, branch `step1-ch6-tools-2`, HEAD `4d3ad3f` (6 commits on
   top of merged master `d50cac4`); remotes `upstream` (macaroni-os/macaroni-fs) +
   `fork` (org-tekeli-borisp/macaroni-fs). Build invocation:

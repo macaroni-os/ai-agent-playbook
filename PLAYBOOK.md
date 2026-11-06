@@ -640,17 +640,23 @@ kernel 7.1.8): read `linuxfromscratch.org/lfs/view/systemd/…` — `/view/stabl
 SysV 12.4 book. The book drifts (rolling snapshots bump versions) — MFS pins its own.
 Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
 
-1. **Sandbox**: `macaroni/phoenix-builder` Incus container, `security.privileged=true`
-   (ships anise-build 0.45.1 + docker 24 — zero install needed). The pool is btrfs → run
-   `dockerd --storage-driver btrfs` with `/var/lib/docker` as a btrfs subvolume. Declare the
-   netfilter prerequisites on the Incus side — maintainer recipe (macaroni-os/ai-agent-playbook#12):
+1. **Sandbox**: `macaroni/phoenix-builder` Incus container (ships anise-build 0.45.1 + docker 24
+   — zero install needed). **`security.privileged` is NOT required** — verified 2026-11-06: a
+   throwaway unprivileged container with only the `docker` profile ran `dockerd
+   --storage-driver btrfs` and a NAT container (`docker run --rm busybox echo DOCKER-NET-OK`)
+   on the btrfs pool. Declare the netfilter prerequisites on the Incus side — maintainer
+   recipe (macaroni-os/ai-agent-playbook#12):
    a `docker` profile with `security.nesting=true` plus `linux.kernel_modules:
    ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter` — incusd runs `modprobe -b <mod>`
    for every entry at each container start — demonstrated end-to-end 2026-11-05: with all five
    unloaded on an idle host, a throwaway launch with the profile brought them back; an entry
-   absent from the host kernel aborts the launch with `Failed to load kernel module 'xt_stat'…`), so the modules follow
-   the container, not the boot — keep the list matched to the host kernel. Manual
-   `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
+   absent from the host kernel aborts the launch with `Failed to load kernel module '<mod>'…`,
+   so the modules follow the container, not the boot — keep the list matched to the host kernel.
+   Do NOT add names the host does not have: `xt_stat` is not a module in the current Omarchy
+   kernel (7.2.15), and a literal entry aborts every launch of the instance with
+   `Failed to load kernel module 'xt_stat': modprobe: FATAL: Module xt_stat not found in
+   directory /lib/modules/7.2.15-1-omarchy` (verified 2026-11-06); the six-entry list above is
+   sufficient. Manual `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
    `Function not implemented`); without the modules, Docker-in-incus NAT dies with the cryptic
    `iptables … Table does not exist`.
      Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
