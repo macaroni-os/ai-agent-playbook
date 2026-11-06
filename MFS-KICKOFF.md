@@ -52,14 +52,16 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   `MAKEFLAGS=[]` with `MAKEOPTS=-j4`; gcc pass-1's `RUN` step still took 2066.5 s
   with the export in place. Evidence + proposed `make ${MAKEOPTS}` fix are in a
   comment on PR #5. Wait for geaaru's call before changing the toolchain specs.
-- **Docker storage driver**: the btrfs driver works, but geaaru recommends XFS +
-  overlay2 as faster (review on this PR, 2026-11-06). Blocked on host provisioning:
-  this host has one LUKS/btrfs disk, no spare XFS partition, no host xfsprogs and
-  no agent root (`losetup` inside the privileged container is EPERM). overlay2 was
-  verified functional in an unprivileged container on the btrfs root (Docker warns
-  "Not using native diff for overlay2 … running in a user namespace"). Ask the human
-  for an XFS mount (partition or mounted loop image, `mkfs.xfs -n ftype=1`), then
-  wire the Incus disk device and capture it end-to-end.
+- **Docker storage driver**: XFS + overlay2 is now the working setup on `mfs-dev`
+  (verified 2026-11-06; faster than the btrfs driver). The operator added
+  `loop-control` / `loop0` / `loop1` unix devices to the container; inside,
+  `/dev/loop0` is an XFS image mounted at `/xfs-docker` (`ftype=1`) and dockerd runs
+  `--data-root /xfs-docker/docker --storage-driver overlay2`. Captured:
+  `Storage Driver: overlay2`, `Backing Filesystem: xfs`, and
+  `docker run --rm busybox echo XFS-OVERLAY-NET-OK` passes. The loop mount and
+  dockerd do NOT survive container restarts (re-create both; xfsprogs is installed
+  in the container). For future unprivileged containers use a host XFS mount plus an
+  Incus disk device instead of the in-container loop.
 
 ## Task order
 1. §8 sweep FIRST — all three endpoints (`issues/N/comments`, `pulls/N/comments`,

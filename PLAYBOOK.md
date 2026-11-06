@@ -659,15 +659,23 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    sufficient. Manual `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
    `Function not implemented`); without the modules, Docker-in-incus NAT dies with the cryptic
    `iptables … Table does not exist`.
-     **Storage driver**: the btrfs driver works, but the maintainer recommends Docker on an XFS
-     filesystem with overlay2 (`mkfs.xfs -n ftype=1`; expose the host XFS mount to the container
-     as a disk device at `/var/lib/docker`; `dockerd --storage-driver overlay2`) — faster than the
-     btrfs driver (review on macaroni-os/ai-agent-playbook#12, 2026-11-06). Not yet exercised
-     end-to-end on this host: it has a single LUKS/btrfs disk with no spare XFS partition, no host
-     `xfsprogs`, and the agent has no host root (`losetup` inside the privileged container fails
-     `Operation not permitted`). overlay2 itself was verified working on the btrfs root in an
-     unprivileged container, with Docker's "Not using native diff for overlay2 … running in a user
-     namespace" warning. Provision the XFS mount first, then capture the recipe end-to-end.
+     **Storage driver (verified 2026-11-06)**: prefer XFS with overlay2 over the btrfs driver —
+     the maintainer's recommendation (review on macaroni-os/ai-agent-playbook#12), it is faster.
+     Two shapes work; both need an XFS filesystem with `ftype=1`:
+     - host XFS partition/mount, exposed to the container as a disk device
+       (`incus config device add <c> storage disk source=<xfs-mount> path=/var/lib/docker`) —
+       the right shape for an unprivileged container;
+     - loop-backed XFS *inside* a privileged container: pass the loop devices in
+       (`incus config device add <c> loop-control unix-char path=/dev/loop-control` plus
+       `loop0`/`loop1` as `unix-block` major 7), then
+       `truncate -s 30G /xfs.img && losetup /dev/loop0 /xfs.img && mkfs.xfs -n ftype=1
+       /dev/loop0 && mount /dev/loop0 /xfs-docker`, and run
+       `dockerd --data-root /xfs-docker/docker --storage-driver overlay2`.
+     Captured on this host: `xfs_info` shows `ftype=1`; `docker info` reports
+     `Storage Driver: overlay2`, `Backing Filesystem: xfs`; `docker run --rm busybox echo
+     XFS-OVERLAY-NET-OK` passes. Docker in a user namespace reports
+     `Native Overlay Diff: false` — expected. The loop mount (and dockerd) must be re-created
+     after a container restart, same as before.
      Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
      works plain — the 2026-11-04 `Image … not found` was transient, the fingerprint workaround is
      dropped per maintainer. The image has no `/root` at first boot: `mkdir /root` before the first
