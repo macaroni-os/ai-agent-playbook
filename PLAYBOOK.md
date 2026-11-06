@@ -659,6 +659,15 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    sufficient. Manual `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
    `Function not implemented`); without the modules, Docker-in-incus NAT dies with the cryptic
    `iptables … Table does not exist`.
+     **Storage driver**: the btrfs driver works, but the maintainer recommends Docker on an XFS
+     filesystem with overlay2 (`mkfs.xfs -n ftype=1`; expose the host XFS mount to the container
+     as a disk device at `/var/lib/docker`; `dockerd --storage-driver overlay2`) — faster than the
+     btrfs driver (review on macaroni-os/ai-agent-playbook#12, 2026-11-06). Not yet exercised
+     end-to-end on this host: it has a single LUKS/btrfs disk with no spare XFS partition, no host
+     `xfsprogs`, and the agent has no host root (`losetup` inside the privileged container fails
+     `Operation not permitted`). overlay2 itself was verified working on the btrfs root in an
+     unprivileged container, with Docker's "Not using native diff for overlay2 … running in a user
+     namespace" warning. Provision the XFS mount first, then capture the recipe end-to-end.
      Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
      works plain — the 2026-11-04 `Image … not found` was transient, the fingerprint workaround is
      dropped per maintainer. The image has no `/root` at first boot: `mkdir /root` before the first
