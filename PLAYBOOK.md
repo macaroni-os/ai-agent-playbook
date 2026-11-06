@@ -640,24 +640,83 @@ kernel 7.1.8): read `linuxfromscratch.org/lfs/view/systemd/…` — `/view/stabl
 SysV 12.4 book. The book drifts (rolling snapshots bump versions) — MFS pins its own.
 Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
 
-1. **Sandbox**: `macaroni/phoenix-builder` Incus container, `security.privileged=true`
-   (ships anise-build 0.45.1 + docker 24 — zero install needed). The pool is btrfs → run
-   `dockerd --storage-driver btrfs` with `/var/lib/docker` as a btrfs subvolume. Host needs
-   `sudo modprobe -a br_netfilter ip_tables iptable_nat xt_nat` after EVERY boot (privileged
-   containers cannot auto-load; `modprobe` from inside fails `Function not implemented`).
-   Docker-in-incus NAT otherwise dies with the cryptic `iptables … Table does not exist`.
+1. **Sandbox**: `macaroni/phoenix-builder` Incus container (ships anise-build 0.45.1 + docker 24
+   — zero install needed). **`security.privileged` is NOT required** — verified 2026-11-06: a
+   throwaway unprivileged container with only the `docker` profile ran `dockerd
+   --storage-driver btrfs` and a NAT container (`docker run --rm busybox echo DOCKER-NET-OK`)
+   on the btrfs pool. Declare the netfilter prerequisites on the Incus side — maintainer
+   recipe (macaroni-os/ai-agent-playbook#12):
+   a `docker` profile with `security.nesting=true` plus `linux.kernel_modules:
+   ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter` — incusd runs `modprobe -b <mod>`
+   for every entry at each container start — demonstrated end-to-end 2026-11-05: with all five
+   unloaded on an idle host, a throwaway launch with the profile brought them back; an entry
+   absent from the host kernel aborts the launch with `Failed to load kernel module '<mod>'…`,
+   so the modules follow the container, not the boot — keep the list matched to the host kernel.
+   Do NOT add names the host does not have: `xt_stat` is not a module in the current Omarchy
+   kernel (7.2.15), and a literal entry aborts every launch of the instance with
+   `Failed to load kernel module 'xt_stat': modprobe: FATAL: Module xt_stat not found in
+   directory /lib/modules/7.2.15-1-omarchy` (verified 2026-11-06); the six-entry list above is
+   sufficient. Manual `sudo modprobe -a …` is the fallback only (in-container `modprobe` fails
+   `Function not implemented`); without the modules, Docker-in-incus NAT dies with the cryptic
+   `iptables … Table does not exist`.
+     **Storage driver (measured 2026-11-06)**: XFS with overlay2 works end-to-end here, but it is
+     **not faster than the btrfs driver on this host** — the sandbox stays on the btrfs driver.
+     Benchmark (loopback shape below, daemons serialized, identical registry digests per pull
+     re-checked across both storages; alpine 8.4 MB, golang:1.27-alpine 253 MB unpacked):
+     pulls are network-bound and a wash (alpine 2.5-2.9 s vs 2.6 s btrfs; golang 10.2-11.6 s vs
+     10.9-13.0 s); a 20k-file create+delete in the writable layer is a wash (3.0-3.5 s vs
+     2.8-3.0 s); ten cold `docker run --rm` cost 7.8-15.0 s vs 6.0-6.4 s; and the synthetic
+     build (6x200 MB COPY layers + extract/delete of a 20k-file tar) ran
+     **27.0 / 55.8 / 70.2 s on overlay2-on-XFS vs 16.1 / 15.3 s on btrfs** — XFS degraded run
+     over run as the sparse loop file grew (loop-over-CoW-btrfs double penalty). A real
+     dedicated XFS partition would dodge that penalty, so the maintainer's partition claim
+     (macaroni-os/ai-agent-playbook#12) stays open — but untestable here (single LUKS/btrfs
+     disk, no spare partition) and nothing measured suggests XFS+overlay2 beats btrfs in this
+     sandbox. Both shapes need `mkfs.xfs -n ftype=1` (overlay2 needs d_type; prove with
+     `xfs_info` → `ftype=1`, `docker info` → `Supports d_type: true`):
+     - production shape (the lxd-compose-galaxy `docker-xfs-fs` profile equivalent): host XFS
+       partition/mount exposed to the container as a disk device —
+       `incus config device add <c> docker-storage disk source=<host-xfs-mount> path=/var/lib/docker`
+       — then `dockerd --storage-driver overlay2`. Works unprivileged, and the storage lives on
+       its own device, independent of the container rootfs and the daily base-image rotation.
+     - loopback shape (what was benchmarked; zero-partition variant): privileged container plus
+       TWO prerequisites. (1) `xfs` on the host kernel — use the same module mechanism as the
+       netfilter list above: `incus config set <c> linux.kernel_modules xfs,ip_tables,ip6_tables,netlink_diag,nf_nat,overlay,br_netfilter`
+       (keep the six existing entries) + container restart — incusd runs `modprobe -b xfs` and
+       the HOST gains `xfs` in `/proc/filesystems` without the agent needing host sudo
+       (verified 2026-11-06; in-container `modprobe xfs` still fails, no modules dir).
+       (2) loop devices are NOT passed by privileged alone — `losetup` fails
+       `Operation not permitted` and even `open(/dev/loop0)` is EPERM until the host hotplugs
+       them: `incus config device add <c> loop-control unix-char path=/dev/loop-control` and
+       `incus config device add <c> loop0 unix-block path=/dev/loop0 major=7 minor=0` (explicit
+       major/minor is required when the host has no `/dev/loop*` nodes). Then inside:
+       `truncate -s 30G /xfs.img && losetup -f --show /xfs.img && mkfs.xfs -n ftype=1 <loop>
+       && mount <loop> /xfs-docker && dockerd --data-root /xfs-docker/docker --storage-driver overlay2`.
+       `docker info` reports `Backing Filesystem: xfs`, `Supports d_type: true`;
+       `Native Overlay Diff: false` on XFS is expected (native diff is ext4/btrfs only).
+     The loop mount (and dockerd) must be re-created after a container restart, same as before.
+     Recreation note (re-verified 2026-11-05): `incus launch macaroni:macaroni/phoenix-builder`
+     works plain — the 2026-11-04 `Image … not found` was transient, the fingerprint workaround is
+     dropped per maintainer. The image has no `/root` at first boot: `mkdir /root` before the first
+     exec that writes there.
 2. **`rc=0` does not mean built**: `make build` with empty `PACKAGES`, anise-build `--all`
    (macaroni-os/anise#36), and cache-pull denials all print `warning` and may exit 0 with
    zero artifacts. Count `build/*.package.tar.zst` and match per-package ✔ lines against the
    DAG size before believing any run. Use `BACKEND=docker REPO_CACHE=` — the Makefile's
-   `dockerv3` default is rejected by released anise-build.
+   `dockerv3` default is rejected by released anise-build. `--pull` does NOT invalidate local
+   cache images: anise-build reuses `anise-build/cache:*` when the spec/tree hash matches, even
+   after the base image rotates (verified 2026-11-05 — a chain run silently verified the old
+   rotation). Run `docker system prune --all --volumes -f` before any clean-slate claim and quote
+   the base-image digest actually used.
 3. **CI (`make validate`) only parses specs — it NEVER executes steps.** Every functional
    claim must come from a local full-chain `make build` + payload smoke. Verification
    standard: rebuild the whole chain from the seed at final head, then run built binaries
    via the SYSROOT loader: `/mfs/usr/lib/ld-linux-x86-64.so.2 --inhibit-cache
    --library-path /mfs/usr/lib <bin> --version`. A target-tool `GLIBC_2.xx not found` on the
    sandbox ROOT is an old-host artifact — re-check inside the current env image before
-   filing it as a bug.
+   filing it as a bug. Maintainer-endorsed rootfs link audit (since 2026-11-04, run on every
+   fresh seed): `whip h linking.check` — walks `/usr/lib*`, `/usr/bin`, `/bin`, `/usr/sbin`,
+   `/usr/libexec` and ends `[linking.check] Completed correctly.` (whip ships in the builder seed).
 4. **Layer model**: each package builds FROM the dependency closure's cache image; the local
    docker daemon holds them, so tail-of-chain iterations cost minutes, full chain ~2 h.
    Any seed change cascades everything. `REPO_CACHE=` keeps pushes out of
@@ -690,6 +749,29 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
      with zero spec changes — probe the fresh image first:
      `docker run --rm --entrypoint bash <image> -c 'for t in grep awk sed find gzip; do
      command -v $t \|\| echo MISSING:$t; done'`.
+   - Rotation takes more than tools: the same day's `latest-amd64` also shipped **no
+       libstdc++/libgcc_s shared libs anywhere**, while pass-1 gcc installs them only under
+       `/usr/lib/gcc/<triplet>/` — invisible to the loader, so every `g++` dies rc=127 and gmp's
+       configure fails with `C++ compiler not available`. Seed-prelude fix: write
+       `/etc/ld.so.conf.d/99-gcc-runtime.conf` + `ldconfig` (macaroni-os/macaroni-fs#3, seed `+12`)
+       — base-image runtime libs are on the "must not assume" list too. And when a maintainer says
+       an image-side fix has landed, probe the CURRENT digest (`docker pull` + file probe,
+       captured) before dropping the in-repo workaround; if the rotation doesn't carry it yet, keep
+       the seed self-sufficient and reply with the evidence (§6).
+    - The `/tmp` guard belongs BEFORE `gcc-config` — it is the consumer, and its absence broke
+      the toolchain while the guard sat at the END of the seed prelude (geaaru's diagnosis of the
+      failure round 1 misattributed to a "missing 05gcc conf" the image in fact already shipped:
+      `eval 'mkdir /tmp || true' && chmod a+rwx /tmp` early in the prelude, macaroni-os/macaroni-fs#3
+      `+14`, real fix pending terragon-side). Root-cause humility: a rotation probe proves the
+      symptom, the maintainer can reframe the cause — re-test attribution after each fix and drop
+      workarounds written for hypotheses that don't survive (the `printf` conf prelude died in the
+      same commit that hoisted the guard).
+    - **`MAKEOPTS` is not read by GNU make.** A spec-level
+      `export MAKEOPTS="-j$(nproc)"` is inert while the calls stay plain `make` (verified
+      2026-11-06: `$(MAKEFLAGS)` stays empty, and gcc pass-1's `RUN` step still took 2066.5 s
+      with the export in place). The value only reaches make via `make ${MAKEOPTS}` or by
+      exporting `MAKEFLAGS`; raised with the maintainer, with the one-line fix, on
+      macaroni-os/macaroni-fs#5.
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
    hypothesis, extracting a fresh tree, beat days of polluted context. And when a toolchain
@@ -700,4 +782,5 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    (the `+N` suffix bumps per build iteration; squash your own intermediate bumps before
    push). Issues are disabled on macaroni-fs: findings go in PR bodies, discussion on
    Discord; org attribution trailers + `Signed-off-by` apply (no `ai_ass` label there —
-   only kit-fixups defines it).
+   only kit-fixups defines it). Sync the PR body with every head push (version `+N`, evidence
+   blocks) — stale body claims land on the reviewer's desk (a "+13" body against a "+11" head).
