@@ -21,8 +21,9 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 - Isolated build sandbox: **`mfs-build`** (unprivileged, `default` + `docker` profile,
   own btrfs daemon) — created 2026-11-06 because a second agent session shares `mfs-dev`
   and swaps its daemon (XFS/btrfs benchmarks), killing in-flight builds. Snapshot
-  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain) and `step1-pass2-green`
-  (clean 26/26 through gcc-pass2). Use `mfs-build` for macaroni-fs
+  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain), `step1-pass2-green` and
+  `step1-pass2-green-r2` (clean 26/26 through gcc-pass2, after the review rounds).
+  Use `mfs-build` for macaroni-fs
   builds; leave `mfs-dev` to the other session.
 - Repo: `/root/macaroni-fs`, master `7ddee9a` (PR #6 merge); active branch
   `step1-pass2`, HEAD `311ee7b` (two commits on `7ddee9a`). Remotes
@@ -30,14 +31,22 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
   Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
   — always verify artifacts (rc=0 lies, §10.2/§7 class).
 - macaroni-os/macaroni-fs: PR #1–#6 MERGED (PR #4 `d50cac4`, PR #5 `e7bd201`,
-  PR #6 `7ddee9a`, 2026-11-06). **PR #7 OPEN** — head `311ee7b`
+  PR #6 `7ddee9a`, 2026-11-06). **PR #7 OPEN** — head `328c626`
   (https://github.com/macaroni-os/macaroni-fs/pull/7): `step1/binutils-pass2`
   (2.46.0) and `step1/gcc-pass2` (16.2.0); clean 26/26 chain plus a real chroot
-  C and C++ compile/run, `whip` green. Open questions in the body: binutils
+  C and C++ compile/run, `whip` green. Review rounds applied: no redundant
+  downloads, one `export` per line, stale pass-1 source tree removed before
+  unpacking; the `--with-gmp/--with-mpfr/--with-mpc=${MFS}/cross-tools` probe
+  builds but leaves `cc1` needing `libmpc.so.3`/`libmpfr.so.6` in the chroot,
+  so the book's in-tree copies stay. Open questions in the body: binutils
   2.47 book drift, `coreutils` 6.5 gap, empty `/usr/lib64` from base.
-- macaroni-os/ai-agent-playbook: PR #11/#12 MERGED; **PR #13 OPEN** carries this
-  handoff refresh (branch `mfs-handoff`, head after the pass-2 refresh commit).
-  Refresh this file at the end of every session; /tmp drafts die on reboots.
+- macaroni-os/ai-agent-playbook: PR #11/#12/#13 MERGED (PR #13 as `0a1c3be`),
+  PR #14 (per-session containers, `a4ed3af`) also merged; this refresh is a new
+  PR. Refresh this file at the end of every session; /tmp drafts die on reboots.
+- **Book ↔ stage mapping**: `step1` is LFS ch.5 + ch.6 (cross toolchain +
+  cross-compiled temporary tools, ending at `gcc-pass2`); `step2` starts at
+  ch.7 (enter chroot + additional temporary tools) and continues into ch.8.
+  That is why binutils-pass2/gcc-pass2 live under `packages/step1/`.
 - macaroni-os/anise#36 OPEN — maintainer undecided between `--all-pkgs-tree` and
   leaving it; watch the thread, don't build on `--all`.
 - Rotation probe before EVERY chain run (§10.7 recipe): base image
