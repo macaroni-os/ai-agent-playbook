@@ -463,6 +463,15 @@ Known rough edges:
 
 - **Sequential, one issue per foreground subagent.** Shared build container + review-focus means
   parallelism buys nothing and corrupts evidence attribution.
+- **The one-container rule extends across sessions: never share a build container between
+  concurrent agent sessions** (macaroni-fs incident 2026-11-06). One session's sanctioned
+  clean-slate `docker system prune --all` wiped the other's 48-image layer cache mid-benchmark,
+  and its daemon swaps killed the other session's live chain build (`rpc error … EOF`); both
+  transcripts briefly described different worlds and the two sessions raced on the same
+  living-handoff file, producing contradicting commits on one PR branch that needed a corrective
+  push. Sequential subagents *within* a session are not enough: a second concurrent session gets
+  its own container, and the session that does NOT own the loop's repo leaves its living docs
+  (e.g. MFS-KICKOFF.md) to the owner.
 - Each briefing includes verbatim: §2 exec/credential recipes, §3 conventions (numbered list is
   compact), §5 checklist, reference PRs to imitate (`gh pr diff <N> --repo macaroni-os/kit-fixups`
   works for merged ones), and the escape hatch: “stale/maintainer-decision → STOP, report with
