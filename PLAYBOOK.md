@@ -408,6 +408,22 @@ Known rough edges:
       scratch dirs). Proof bar: generated ebuilds `cmp`-identical to `/var/db/pkg/<cat>/<pn>-<pv>/<pn>.ebuild`
       (§5.2) or to what you built; `-bin` trees regenerate byte-identical.
 
+ 41. **Go bundles v2 (mark-devkit ≥0.36.0): `gosum_paths` + `markdevkit_min_version`**
+      (released from macaroni-os/mark-devkit#9, alloy swap-in kit-fixups#526):
+      `extensions_defs.golang.opts.gosum_paths: go.sum,collector/go.sum` — paths relative to the
+      UNPACKED repo root (pin the entry dir with `unpack_srcdir_prefix`), all sums share one
+      bundle dir deduped by proxy-filename → the bundle is the EXACT UNION (alloy: 49
+      collector-only module@versions land; verify with a fresh set-diff, bundle==union±0).
+      `markdevkit_min_version` is a CLUSTER-level key (`AutogenDefinition`) and a HARD gate:
+      `ProcessDefinition` refuses the whole definition (autogen-thin too) when the running tool
+      is older — pin it only on clusters that require the newer option, or you break their
+      generation on older releases. Verifying a FIRST-EVER bundle locally: stage the
+      extension-generated `mark-go-bundle` tarball + generated Manifest into DISTDIR and
+      `emerge -1` (assume-digests; `GOPROXY=file://` then works WITH network-sandbox on — that
+      IS the proof the interim `restrict: strip network-sandbox` crutch is gone); the public
+      mirror upload stays the bot's post-merge job (#848 answer). `portageq envv FEATURES` can
+      print empty — `emerge --info` is the FEATURES ground truth.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -619,6 +635,18 @@ u. **A red CI on your PR may be repo-wide bit-rot — run control checks BEFORE 
    dependabot branch). Fixing infra inside the feature PR is acceptable when the diagnosis is
    airtight: separate commit, local gate (`make deps` + suite) first, full disclosure in a PR
    comment, feature code untouched.
+
+v. **A go.sum bundle set-diff is only as sound as its path decoding** — the `mark-go-bundle`
+   tarball lists PROXY paths that are URL-encoded (`cel.dev%2Fexpr%2F@v%2Fv0.25.3.zip`); to compare
+   against go.sum `module@version` you must, IN ORDER: (1) `sed %2F→/`, (2) strip `mark-go-bundle-<pn>/`
+   + `/@v/`→`@` + `.zip`, (3) undo case-encoding `!x→X`, and filter to `.zip` (the `.mod` rows inflate
+   the count). A mis-ordered decode matches NOTHING and every collector-only module shows
+   "MISSING" — a false alarm that looks like a real bundle defect. Persist the RAW inputs (both
+   go.sums + the bundle tar-list), not intermediate set files — observed: the derived
+   set-root/coll/union.txt were 0 bytes while only the bundle list survived, yet the claim was
+   already public. Re-derive from raw and assert `bundle_zips == union`, `collonly_NOT_in_bundle==0`,
+   `bundle_NOT_in_union==0` before trusting any posted number (this is §7e applied to your OWN
+   orchestrator check: verify the artifact backs a public claim BEFORE posting it, not after).
 
 ## 8. Feedback sweep (do it between every task)
 
