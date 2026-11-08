@@ -1,16 +1,19 @@
 # K8S loop handoff — macaroni-os/mark-issues#862 (living doc, refresh every session)
 
-**STATUS 2026-11-08 evening: LOOP COMPLETE.** All merged: kit-fixups #525, #530–#546 + macaroni-commons
-#4/#5 (the full core-server-kit Kubernetes/Cilium autogen stack: etcd, cri-o, kubectl, kubelet, kubeadm,
-kube-proxy, cilium-cli, cilium-agent across mark-unstable + mark-xl/iii/31). Final summary comment posted
-on the closed issue (#issuecomment-6722244106 — first version had the §7p slash-list trap `#531/#532/#533`
-→ tails auto-linked to mark-issues!; PATCHed to fully-qualified form; LESSON: audit must run BEFORE the
-first post, and rendered link-count is NOT a proxy — same-repo bare #NNN auto-links to the WRONG repo's
-issues). Playbook §3.48 + this doc → ai-agent-playbook PR #18 (open at time of writing).
+**STATUS 2026-11-08 night: REOPENED ROUND SHIPPED.** geaaru reopened #862 asking about kube-apiserver/
+controller-manager/scheduler → filed #547 (trio cluster entries; Closes: lives here) + #548–550 (xl/iii/31).
+Round 2 on #547 done per review ("drop all lines with entity_pr and the comment"): provenance machinery
+fully removed incl. kubelet(4)/kube-proxy(5) refs, kindIs branch dropped, head `2d51bea90`, 28-cell
+identity/comment-only table, 5 rebuilds rc=0. First-half board (all MERGED): kit-fixups #525, #530–#546 +
+macaroni-commons #4/#5. Lessons this round → §3.49 + §7z (pending-review 422 blocker). Playbook doc PR #18
+carries all of it. Closing note for the first half posted on the issue (#issuecomment-6722244106 — first
+version had the §7p slash-list trap `#531/#532/#533` → tails auto-linked to mark-issues!; PATCHed to
+fully-qualified form; LESSON: audit must run BEFORE the first post, and rendered link-count is NOT a
+proxy — same-repo bare #NNN auto-links to the WRONG repo's issues).
 Leftovers offered on the issue, awaiting maintainer if ever: iii/31 legacy plain cri-o atom → 3-track
-alignment; cilium socket-group entity; -bin flavours; control-plane trio (apiserver/cm/scheduler,
-entities 432–434 ready); kubelet completions symmetry; mark-devkit 0.36.1 Manifest-drift issue;
-tcp-wrappers gcc-16 rot.
+alignment; cilium socket-group entity; -bin flavours; kubelet completions symmetry (now also applies
+to the trio — probed, all answer cobra completion, kept off per precedent); mark-devkit 0.36.1
+Manifest-drift issue; tcp-wrappers gcc-16 rot.
 Container `mark-contrib-862` still up (snapshot bootstrap-clean) — keep until reviews on #18 land, then
 `incus delete`.
 

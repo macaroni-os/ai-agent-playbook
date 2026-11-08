@@ -509,6 +509,19 @@ Known rough edges:
        selector bounds untouched; a spec-only refactor that changes no resolution needs NO
        propagation-branch rework (§3.38) — the release branches carry the merge ATOM only.
 
+ 49. **Shared-cluster body edits are proven by a per-track identity table, and whole sprig branches
+     delete cleanly** (kit-fixups#547 round 2): a `{{- if .Values.<flag> }}` guard in a cluster
+     `defaults.vars.body` means non-flag entries are provably untouched (kubectl/kubeadm regenerated
+     ZERO-delta) — state it per package per track. Deleting a complete `{{- if }}/{{- else }}/{{- end }}`
+     block plus its rendered sentence leaves no whitespace residue IF the flanking literal lines keep
+     identical indentation: the `{{-` trim markers own the surrounding newlines, so the remaining
+     literals rejoin exactly (verified: all service entries COMMENT-ONLY(-1), the removed sentence
+     line, and files//Manifests identical — 28/28 cells). Same-round re-selection must be asserted
+     (both runs captured the same 3 versions) so the table cannot be polluted by upstream releases.
+     Maintainer stance confirmed the same session: entity-provenance comments in generated ebuilds
+     are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
+     macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
+
 
 ## 4. Fix-pattern quick table
 
@@ -759,6 +772,14 @@ x. **Sandbox `/var/tmp` mode 755 breaks rootless image pulls** — containers/im
 y. **`mark-devkit autogen` defaults to `--sync=true`** — a review-side local run uploads generated
    artifacts (Rust/Go bundles) to the shared S3/minio mirror. Always pass `--sync=false` for
    review-side generation; the mirror upload belongs to the bot's post-merge job (§3.44).
+
+z. **A stray PENDING review by your own account silently blocks threaded replies** (kit-fixups#547
+   round 2, 2026-11-08): `POST pulls/<n>/comments/<id>/replies` fails `422 user_id can only have one
+   pending review per pull request` when an unsubmitted draft review exists on the PR (left behind by
+   an earlier failed/aborted comment attempt — invisible unless you sweep `pulls/<n>/reviews`). The
+   "ignore the draft" instinct is wrong once a reply is due: the draft must be DISMISSED
+   (`gh api -X DELETE repos/<org>/<repo>/pulls/<n>/reviews/<id>` — safe for your own empty-body
+   PENDING review), then the reply posts as an ordinary COMMENTED review record.
 
 ## 8. Feedback sweep (do it between every task)
 
