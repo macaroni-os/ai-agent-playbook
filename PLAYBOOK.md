@@ -84,6 +84,10 @@ Known rough edges:
 - `mark-devkit` (install/build from source if the image lacks it): **use `autogen-thin`** for
   spec verification. Full `autogen` runs the merge phase, which needs `anise-portage-converter`
   (often absent; the `app-misc/anise` currently installable provides only the luet CLI).
+  **`autogen-thin` does not run extensions**: Rust/Go bundles (`mirror://macaroni/…-mark-*-bundle-…`)
+  are only produced by full `autogen --skip-merge --keep-workdir --sync=false` (the merge phase is
+  skipped, so no converter is needed). `--sync=false` is mandatory locally — the default uploads
+  generated artifacts to the shared S3/minio mirror (§3.44).
 - If issue-filing experiments left **stale `/etc/portage/patches/<atom>/` dirs**, they
   double-apply against ebuild PATCHES and fail the build. Do not delete system state to verify —
   use a sandbox config: copy `/etc/portage` → `/root/pcr`, drop the stale dir there, run
@@ -424,6 +428,69 @@ Known rough edges:
       mirror upload stays the bot's post-merge job (#848 answer). `portageq envv FEATURES` can
       print empty — `emerge --info` is the FEATURES ground truth.
 
+ 42. **A "please autogen `<pn>`" issue covers the helper stack the package needs to RUN**
+      (mark-issues#861, podman 6.1.4). Podman 6 fails at startup without `conmon`, an OCI runtime
+      and `netavark` (the ONLY supported network backend — `Error: could not find "netavark" …`),
+      and rootless additionally needs `crun`, `pasta` and `fuse-overlayfs`; **`slirp4netns` support
+      was REMOVED in podman 6** (`slirp4netns support has been removed, use --network=pasta
+      instead`). When none of those atoms exists in any kit, ship the minimal working set in the
+      same PR (nine here: podman, conmon, catatonit, netavark, aardvark-dns, crun, fuse-overlayfs,
+      passt, containers-shortnames) — the issue's `Closes:` stays on the completing PR (§3.23).
+      House category for container tooling is **`app-emulation`** (these kits have no
+      `app-containers` category; operator-confirmed). `rootlesskit` is NOT a podman dependency
+      (that is Docker's rootless helper) — don't add it just because a rootless list mentions it.
+
+ 43. **Vendored Go sources must force `GOFLAGS=-mod=vendor` — `go-module` sets `-mod=readonly`**
+      (podman 6.1.4, kit-fixups#524). The eclass exports `GOFLAGS="-v -x -mod=readonly"`, which
+      defeats Go's automatic vendor-directory selection even when a complete `vendor/` is present;
+      the build then reaches `proxy.golang.org` and dies offline (`dial tcp … network is
+      unreachable`). Re-export the mode in the spec `body:`'s `src_compile`:
+      `export GOFLAGS="-v -x -mod=vendor"` (same shape as docker/runc). Proved by a full
+      `emerge -1`, `qlist -Iv`, and a rootful smoke (§5).
+
+ 44. **`autogen-thin` does not run extensions — generate Rust/Go bundles with full `autogen`**
+      (`--skip-merge --keep-workdir --sync=false`, podman stack #861). `autogen-thin` emits the
+      ebuild + Manifest but leaves `mirror://macaroni/…-mark-rust-bundle-….tar.xz` unfetched, so a
+      Rust source flavour cannot be built. Full `autogen --skip-merge --keep-workdir --sync=false
+      --skip-reposcan-generation --to <dir>` runs the extension locally and drops the bundle in
+      `<dir>/downloads`; copy `<dir>/downloads/*` into DISTDIR before `emerge -1`, then prove
+      `cmp` identity between the installed `/var/db/pkg/…` ebuild and the generated one (§5.2).
+      **Never run a review-side `autogen` with the default `--sync=true`**: it uploads generated
+      artifacts to the shared S3/minio mirror, which belongs to the bot's post-merge job.
+
+ 45. **cgit-only upstreams are trackable with `builtin-dirlisting` on the cgit tags page**
+      (passt, #861). passt has no GitHub/Forgejo/GitLab repo, but
+      `https://passt.top/passt/refs/tags/` lists per-tag `snapshot/passt-<tag>.tar.xz` links: use
+      that as `dir.url` with `matcher: 'passt-.*\.tar\.xz$'`, strip the tag commit with
+      `regex: '\.[0-9a-f]+$'`, then map `_`→`.` for the version (`2026_10_02.cba3570` →
+      `2026.10.02`). The unpack root is the raw snapshot directory, not `${P}` — add
+      `post_src_unpack() { mv ${WORKDIR}/passt-* ${S}; }` and pass `VERSION=<version>` to make
+      (otherwise `--version` reports `unknown version`). Only fall back to a pinned
+      `builtin-noop` when the upstream has no machine-readable listing at all (justify in a
+      comment, §3.2).
+
+ 46. **Daemon-style tools on systemd: ship a `.socket` + socket activation, not
+      `Environment=SOCKET=`** (geaaru review, kit-fixups#524). Upstream podman ships
+      `podman.socket` (`ListenStream=%t/podman/podman.sock`, `SocketMode=0660`) and a
+      `podman.service` with `Requires=`/`After=podman.socket`; the daemon takes the socket via
+      systemd socket activation (`activation.Listeners()`), so the service must NOT bind a URI
+      itself. Keep `EnvironmentFile=-/etc/conf.d/<pn>` on the Macaroni-owned unit for
+      `LOG_LEVEL`-style knobs (the SAME `/etc/conf.d` file as the OpenRC initd), `Type=exec`,
+      `Delegate=true`, `KillMode=process`. Verify what is verifiable: both units land in `files/`,
+      the generated ebuild installs the pair under `use systemd`, and the OpenRC path still
+      builds/runs; when `sys-apps/systemd` is absent from the kit, state that the systemd side was
+      not exercised instead of implying a green test.
+
+ 47. **New-package release-branch atom PRs: check the target tree BEFORE filing** (§3.20, podman
+      stack #861). On `mark-xl`/`mark-iii`/`mark-31`, `git ls-tree -r origin/<branch>` first — those
+      branches carry merge recipes only (`<kit>/merge.kit.d/tools.yml`, often no `*_autogen.yml`),
+      so edit the file that actually exists. Check the language floor against the BRANCH, not
+      unstable (§7t): podman's `go.mod` floor is `1.26.0` and `lang-kit@<branch>` shipped up to
+      1.27.3 / 1.26.9 / 1.26.10 — all pass; also confirm every build/runtime atom exists there
+      (`contents/<cat>/<pn>?ref=<branch>` for protobuf, fuse, nftables, gpgme, sqlite, …). Record
+      those checks in the PR body; propagation PRs take `Bugs:` (the completing PR owns `Closes:`).
+
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -449,6 +516,10 @@ Known rough edges:
 | `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
 | "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
 | `go: go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)` — builds on unstable, fails on a release branch | inherit `go-module` (§3.37): its `src_prepare` rewrites the go.mod directive to the local toolchain; do NOT version-pin or downgrade the source to appease a tree |
+| `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
+| upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
+| rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
+| systemd unit models the API socket as `Environment=SOCKET=…` | upstream shape is a `.socket` unit + socket activation, with `EnvironmentFile=-/etc/conf.d/<pn>` only for `LOG_LEVEL`-style knobs (§3.46) |
 
 ## 5. Verification standard (per PR)
 
@@ -471,6 +542,11 @@ Known rough edges:
    worktree (`git worktree add --detach /tmp/a-wt upstream/mark-unstable` → autogen-thin → deploy
    its ebuild + files_dir into the kit copy) rather than blocking on the bot. (awscliv2 #492 vs
    aws-crt-python #491.)
+   **Rust/Go source flavours**: `autogen-thin` does not run extensions, so a
+   `mirror://macaroni/…-mark-*-bundle-…` distfile stays unfetched. Generate it with full
+   `autogen --skip-merge --keep-workdir --sync=false … --to <dir>`, stage `<dir>/downloads/*` into
+   DISTDIR, then `emerge -1` (§3.44); finish with the `cmp` byte-identity check against
+   `/var/db/pkg/…/<pn>.ebuild` (§5.2).
 4. Restore sandbox state (git checkout per kit, remove test dirs, shred temp token files).
 5. Only then: PR / review replies with the captured evidence (PR body carries the
    `Closes:`/`Bugs:` line per §3.23; label the PR `ai_ass` where the repo defines it, §3.39).
@@ -647,6 +723,23 @@ v. **A go.sum bundle set-diff is only as sound as its path decoding** — the `m
    already public. Re-derive from raw and assert `bundle_zips == union`, `collonly_NOT_in_bundle==0`,
    `bundle_NOT_in_union==0` before trusting any posted number (this is §7e applied to your OWN
    orchestrator check: verify the artifact backs a public claim BEFORE posting it, not after).
+
+w. **A nested Incus sandbox cannot prove rootless container `run`** — rootless podman/crun must
+   mount `proc` inside a user namespace, which the unprivileged container denies (`crun: mount
+   'proc' to 'proc': Operation not permitted: OCI permission denied`). Prove it is the environment,
+   not the package, with a bare `unshare -Urmpf --mount-proc` (same EPERM) and a second runtime
+   (runc fails identically). Rootless `podman info` + `pull` ARE still provable (storage created
+   under `$HOME`, netavark selected) — report exactly those greens and mark the `run` step
+   sandbox-blocked instead of hiding it (podman stack #861).
+
+x. **Sandbox `/var/tmp` mode 755 breaks rootless image pulls** — containers/image stages copies in
+   `/var/tmp` (`mkdir /var/tmp/container_images_storage…: permission denied`); the standard mode is
+   1777. Check `stat -c %a /var/tmp` before blaming the package and restore 1777 for the test
+   (container state, never in the spec).
+
+y. **`mark-devkit autogen` defaults to `--sync=true`** — a review-side local run uploads generated
+   artifacts (Rust/Go bundles) to the shared S3/minio mirror. Always pass `--sync=false` for
+   review-side generation; the mirror upload belongs to the bot's post-merge job (§3.44).
 
 ## 8. Feedback sweep (do it between every task)
 
