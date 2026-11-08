@@ -796,7 +796,12 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
       `--without-zstd`. The book's `m64=../lib` sed does not stop GCC's target libs
       (incl. `libgcc_s.so.1`) from landing in `${MFS}/usr/lib64` while the driver
       searches `/usr/lib` — consolidate into `/usr/lib` and drop `/usr/lib64` from the
-      staged trees. Proof bar: a real chroot C **and** C++ compile+run (add a test-only
+      staged trees. Also `rm -rf` the pass-1 source tree before unpacking, or stale
+      objects from pass 1 can leak into pass 2. The in-tree GMP/MPFR/MPC copies are
+      required too: pointing `--with-gmp/--with-mpfr/--with-mpc` at
+      `${MFS}/cross-tools` builds green but leaves the installed `cc1` needing
+      `libmpc.so.3`/`libmpfr.so.6` (not found in the chroot, verified 2026-11-07).
+      Proof bar: a real chroot C **and** C++ compile+run (add a test-only
       `/lib/ld-linux-x86-64.so.2` link because the loader lives in `/usr/lib`).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
    repro attempts produced three contradictory m4 results; one throwaway container per
