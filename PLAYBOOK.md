@@ -490,6 +490,25 @@ Known rough edges:
       (`contents/<cat>/<pn>?ref=<branch>` for protobuf, fuse, nftables, gpgme, sqlite, …). Record
       those checks in the PR body; propagation PRs take `Bugs:` (the completing PR owns `Closes:`).
 
+ 48. **Collapsing a shared-upstream cluster to ONE parametrized `defaults.vars.body` with sprig
+       guards** (geaaru review on macaroni-os/kit-fixups#539: "create a new definition key …
+       keep less lines is better"): when several `packages:` of one cluster share a big body and
+       differ only by (a) an optional sub-block and (b) a couple of literals, hoist the body ONCE
+       under `defaults.vars:` and toggle the deltas with sprig branches —
+       `{{- if .Values.<flag> }} … {{- end }}` — driven by per-package `vars`. Binary/cmd names
+       come from `.Values.pn` (`WHAT=cmd/{{ .Values.pn }}`). Byte-identity survives the
+       space-pair→tab normaliser because `{{- if }}`/`{{- end }}` left-trim their own newline, so
+       a false branch leaves NO blank line — verified: kubernetes `kubectl/kubelet/kubeadm/
+       kube-proxy` (completions on/off, service+static-account on/off, uid/entity_pr as vars)
+       regenerated 12/12 ebuilds + 4/4 Manifests `cmp`-clean across all tracks, cluster 461→211
+       lines. Custom keys (`completions`, `service`, `uid`, `entity_pr`) are ignored by the
+       template but read by the body; overriding a defaults scalar per-package (`completions:
+       true`→`false`) works — a zero-delta run IS the proof the merge chain is live (an inert
+       guard would leak the wrong block). `inherit`/`iuse` still must be REPEATED per entry
+       (package `vars` replace those list keys, §3.31/§3.37). Keep the maintainer's own merged
+       selector bounds untouched; a spec-only refactor that changes no resolution needs NO
+       propagation-branch rework (§3.38) — the release branches carry the merge ATOM only.
+
 
 ## 4. Fix-pattern quick table
 
