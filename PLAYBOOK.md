@@ -548,6 +548,7 @@ Known rough edges:
 | `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
 | "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
 | `go: go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)` — builds on unstable, fails on a release branch | inherit `go-module` (§3.37): its `src_prepare` rewrites the go.mod directive to the local toolchain; do NOT version-pin or downgrade the source to appease a tree |
+| Go package compiles on OLDER go but dies on the NEWEST with `undefined:` errors inside vendored deps (e.g. kube-openapi `go-json-experiment` shim on go ≥1.27) | a toolchain **ceiling**, not a floor — §3.37's rewrite only ever helps downward; bound `BDEPEND ">=dev-lang/go-A <dev-lang/go-B"` from the upstream's pinned `toolchain` directive / CI and disclose it in the PR body (ovn-kubernetes spec, macaroni-os/kit-fixups#557; verify every release branch actually carries a version inside the window before propagating) |
 | `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
@@ -780,6 +781,16 @@ z. **A stray PENDING review by your own account silently blocks threaded replies
    "ignore the draft" instinct is wrong once a reply is due: the draft must be DISMISSED
    (`gh api -X DELETE repos/<org>/<repo>/pulls/<n>/reviews/<id>` — safe for your own empty-body
    PENDING review), then the reply posts as an ordinary COMMENTED review record.
+
+aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11-09, three hits in one
+    session): `--jq '.[0:4]'` on releases made a live project look "frozen since 2022" and reached the
+    MAINTAINER in a public comment before the next probe found five modern semver releases (v1.4.0
+    published 2026-09 — the NAME looked old, the DATE was fresh: sort/compare on dates and shas, never
+    on version-name vibes); default pagination did the same to tags; a mis-sliced `--jq` silently
+    returned `[]` for "no PRs touching X". Rule: before any public or briefing claim of the form
+    "X does not exist / is frozen / has no Y", re-run unbounded (`?per_page=100`, no slice, raw length
+    printed) and quote the count. Correcting a posted public claim: own it in the same thread with the
+    evidence (the maintainer reply "I see regular tags" was exactly this catch).
 
 ## 8. Feedback sweep (do it between every task)
 

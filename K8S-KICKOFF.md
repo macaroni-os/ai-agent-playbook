@@ -1,19 +1,30 @@
 # K8S loop handoff — macaroni-os/mark-issues#862 (living doc, refresh every session)
 
-**STATUS 2026-11-08 night: REOPENED ROUND SHIPPED.** geaaru reopened #862 asking about kube-apiserver/
-controller-manager/scheduler → filed #547 (trio cluster entries; Closes: lives here) + #548–550 (xl/iii/31).
-Round 2 on #547 done per review ("drop all lines with entity_pr and the comment"): provenance machinery
-fully removed incl. kubelet(4)/kube-proxy(5) refs, kindIs branch dropped, head `2d51bea90`, 28-cell
-identity/comment-only table, 5 rebuilds rc=0. First-half board (all MERGED): kit-fixups #525, #530–#546 +
-macaroni-commons #4/#5. Lessons this round → §3.49 + §7z (pending-review 422 blocker). Playbook doc PR #18
-carries all of it. Closing note for the first half posted on the issue (#issuecomment-6722244106 — first
-version had the §7p slash-list trap `#531/#532/#533` → tails auto-linked to mark-issues!; PATCHed to
-fully-qualified form; LESSON: audit must run BEFORE the first post, and rendered link-count is NOT a
-proxy — same-repo bare #NNN auto-links to the WRONG repo's issues).
-Leftovers offered on the issue, awaiting maintainer if ever: iii/31 legacy plain cri-o atom → 3-track
-alignment; cilium socket-group entity; -bin flavours; kubelet completions symmetry (now also applies
-to the trio — probed, all answer cobra completion, kept off per precedent); mark-devkit 0.36.1
-Manifest-drift issue; tcp-wrappers gcc-16 rot.
+**STATUS 2026-11-09 night: OVN ROUNDS SHIPPED — 8 PRs awaiting review.** Timeline: trio round
+(#547 + #548–550, entity_provenance machinery dropped per review) all MERGED 2026-11-08 ~20:43Z.
+geaaru REOPENED #862 2026-11-09 for OVN-related k8s networking (his OVN PR = macaroni-os/kit-fixups#552,
+net-kit, ANOTHER SESSION — never touch; #551 dev-python/ovs already merged, by that session too):
+- **kube-ovn round**: #553 (main, Closes: on #862) + #554–556. Core binaries + `helpers` USE + `kube-ovn-ipsec`
+  rename per maintainer notes; argv[0]-dispatch discovery (kube-ovn-cmd symlink shape); bundle path (etcd
+  precedent); no init; ovn/ovs RDEPEND deferred to #552 merge. (Dispatching agent died silently after
+  finishing everything — §7n salvage held: all evidence in PR body + /root/862g-ok/.)
+- **ovn-kubernetes round**: #557 (main, Closes: sole closer) + #558–560. Two-package split per geaaru
+  (sys-cluster/ovn-kubernetes + sys-cluster/ovn-k8s-cni-overlay → /opt/cni/bin), tracks 1.2.0/1.3.0/1.4.0,
+  helpers USE, vendored build. KEY FINDING (§7-class): ovn-kubernetes has a go TOOLCHAIN CEILING —
+  fails to COMPILE with go ≥1.27 (vendored kube-openapi go-json-experiment shim; upstream pins
+  toolchain go1.26.3) → BDEPEND bounded `>=1.26.0 <1.27.0`; all four branches carry 1.26.x. Also my
+  "3 modern tags" claim was wrong (5: v1.0.0…v1.4.0) — agent kept 1.2/1.3/1.4 + disclosed.
+- **Corrections I posted on the issue**: my "tags frozen since 2022" was WRONG (semver resumed
+  2024-2026; releases even upload binary assets + the OVN/OVS/k8s compat matrix geaaru meant — the
+  matrix parsing stays a mark-devkit follow-up idea of his).
+- Stacking: #557 atoms EOF-append onto the SAME net-base_autogen.yml/net-base.yml lines #553–556 append
+  → first merge wins, second needs a keep-both one-line rebase (§7c) — disclosed in bodies.
+- Container note: mark-contrib-862 now has dev-lang/go 1.26.10 installed (portage resolved the ovn-k
+  BDEPEND ceiling) — later rounds' baseline awareness.
+- Merged board so far: #525, #530–551 (incl. trio + #552 pending), commons #4/#5. Playbook doc PR #18
+  still open (this doc + §3.48/§3.49/§7z live there).
+- Open offers on the issue: init trios if wanted; -bin flavours for ovn-k (assets exist); 1.0/1.1
+  ovn-k tracks; acl_sample/ovn_ic_controller binaries; ovn/ovs RDEPEND wiring once #552 merges.
 Container `mark-contrib-862` still up (snapshot bootstrap-clean) — keep until reviews on #18 land, then
 `incus delete`.
 
