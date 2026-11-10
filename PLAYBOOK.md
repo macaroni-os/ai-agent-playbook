@@ -88,6 +88,11 @@ Known rough edges:
   are only produced by full `autogen --skip-merge --keep-workdir --sync=false` (the merge phase is
   skipped, so no converter is needed). `--sync=false` is mandatory locally — the default uploads
   generated artifacts to the shared S3/minio mirror (§3.44).
+  **Correction (mark-devkit 0.36.1 probe, 2026-11-10):** `autogen-thin --to <dir>` DOES run the
+  golang extension bundle build for a cluster that declares it — the whole proxy closure
+  downloads (~20 min/repo) and the repacked bundle tarball drifts ±200 B in size/digest per run
+  (the known nondeterminism) while distfile NAMES stay stable; budget for it on every spec
+  iteration.
 - If issue-filing experiments left **stale `/etc/portage/patches/<atom>/` dirs**, they
   double-apply against ebuild PATCHES and fail the build. Do not delete system state to verify —
   use a sandbox config: copy `/etc/portage` → `/root/pcr`, drop the stale dir there, run
@@ -331,12 +336,17 @@ Known rough edges:
      literal (§3.8/§3.15 principle applied to version literals too). When a source flavour must
      reference the exact tag build, stamp `{{ .Values.pv }}-{{ substr 0 7 .Values.sha }}` (sprig
      `substr`, already used in-repo by the fish cluster) — e.g. `-X main.Version=3.1.1-9db7df7`.
-     **BUT: `.Values.sha` is the GitHub release `target_commitish`, not a commit sha.** For a repo
-     using `ignore_tags: true` the releases' target_commitish is a branch name (mimir: literally
-     `main`), so the stamp renders `3.2.4-main` — for such repos fall back to plain `{{ .Values.pv }}`
-     (or a tag-pinned sha from elsewhere). The distfile auto-name suffix (`<pn>-<pv>-<sha7>.tar.gz`)
-     is the tag-object sha, which can differ from the unpack-root sha7 (peeled vs tag object) — the
-     `mv <user>-<repo>-*` wildcard in §3.36 absorbs either.
+     **BUT check the generator version:** mark-devkit ≥0.36.1 `builtin_github.go` sets
+     `sha = tag.Commit.GetSHA()` — the 40-char TAG COMMIT sha — whenever the tag resolves
+     (probed live on kube-ovn + ovn-kubernetes, kit-fixups#553/#557 round 2, 2026-11-10: renders
+     the real commit on all six tracks, and the maintainer explicitly prefers
+     `COMMIT={{ .Values.sha }}` over any unpack-time sha stash). The older trap stands only for
+     the `ignore_tags: true` fallback, where sha falls back to the release `target_commitish`
+     and can be a BRANCH name (mimir: literally `main`) — there, fall back to plain
+     `{{ .Values.pv }}`. Related edge proven the same day: an ANNOTATED tag's recovered tarball
+     unpack root is named by the tag-OBJECT sha while the distfile auto-name suffix
+     (`<pn>-<pv>-<sha7>.tar.gz`) carries the commit sha — the `mv <user>-<repo>-*` wildcard in
+     §3.36 absorbs either, but never stash `${d##*-}` from the unpack dir as "the commit".
  36. **Source flavour = generator tarball recovery + `post_src_unpack`, assets live under `-bin`**
      (settled convention, macaroni-os/kit-fixups#514 review, geaaru 2026-11-01, verified on
      tempo/loki/mimir): do NOT list the GitHub `archive/refs/tags/...` tarball as an explicit source
@@ -490,6 +500,38 @@ Known rough edges:
       (`contents/<cat>/<pn>?ref=<branch>` for protobuf, fuse, nftables, gpgme, sqlite, …). Record
       those checks in the PR body; propagation PRs take `Bugs:` (the completing PR owns `Closes:`).
 
+ 48. **Collapsing a shared-upstream cluster to ONE parametrized `defaults.vars.body` with sprig
+       guards** (geaaru review on macaroni-os/kit-fixups#539: "create a new definition key …
+       keep less lines is better"): when several `packages:` of one cluster share a big body and
+       differ only by (a) an optional sub-block and (b) a couple of literals, hoist the body ONCE
+       under `defaults.vars:` and toggle the deltas with sprig branches —
+       `{{- if .Values.<flag> }} … {{- end }}` — driven by per-package `vars`. Binary/cmd names
+       come from `.Values.pn` (`WHAT=cmd/{{ .Values.pn }}`). Byte-identity survives the
+       space-pair→tab normaliser because `{{- if }}`/`{{- end }}` left-trim their own newline, so
+       a false branch leaves NO blank line — verified: kubernetes `kubectl/kubelet/kubeadm/
+       kube-proxy` (completions on/off, service+static-account on/off, uid/entity_pr as vars)
+       regenerated 12/12 ebuilds + 4/4 Manifests `cmp`-clean across all tracks, cluster 461→211
+       lines. Custom keys (`completions`, `service`, `uid`, `entity_pr`) are ignored by the
+       template but read by the body; overriding a defaults scalar per-package (`completions:
+       true`→`false`) works — a zero-delta run IS the proof the merge chain is live (an inert
+       guard would leak the wrong block). `inherit`/`iuse` still must be REPEATED per entry
+       (package `vars` replace those list keys, §3.31/§3.37). Keep the maintainer's own merged
+       selector bounds untouched; a spec-only refactor that changes no resolution needs NO
+       propagation-branch rework (§3.38) — the release branches carry the merge ATOM only.
+
+ 49. **Shared-cluster body edits are proven by a per-track identity table, and whole sprig branches
+     delete cleanly** (kit-fixups#547 round 2): a `{{- if .Values.<flag> }}` guard in a cluster
+     `defaults.vars.body` means non-flag entries are provably untouched (kubectl/kubeadm regenerated
+     ZERO-delta) — state it per package per track. Deleting a complete `{{- if }}/{{- else }}/{{- end }}`
+     block plus its rendered sentence leaves no whitespace residue IF the flanking literal lines keep
+     identical indentation: the `{{-` trim markers own the surrounding newlines, so the remaining
+     literals rejoin exactly (verified: all service entries COMMENT-ONLY(-1), the removed sentence
+     line, and files//Manifests identical — 28/28 cells). Same-round re-selection must be asserted
+     (both runs captured the same 3 versions) so the table cannot be polluted by upstream releases.
+     Maintainer stance confirmed the same session: entity-provenance comments in generated ebuilds
+     are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
+     macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
+
 
 ## 4. Fix-pattern quick table
 
@@ -516,6 +558,7 @@ Known rough edges:
 | `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
 | "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
 | `go: go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)` — builds on unstable, fails on a release branch | inherit `go-module` (§3.37): its `src_prepare` rewrites the go.mod directive to the local toolchain; do NOT version-pin or downgrade the source to appease a tree |
+| Go package compiles on OLDER go but dies on the NEWEST with `undefined:` errors inside vendored deps (e.g. kube-openapi `go-json-experiment` shim on go ≥1.27, kit-fixups#557 round 2) | a toolchain **ceiling** BDEPEND bound (`>=dev-lang/go-A <dev-lang/go-B`) — from the upstream's pinned `toolchain` directive / CI — is the house answer when the committed `vendor/` can't be fixed from the ebuild; `GOTOOLCHAIN=auto` is NOT an escape (the `toolchain` line only switches when local < the `go` directive — a newer local never downswitches; PROBE both modes before conceding a maintainer's "CI builds it fine"), verify every release branch carries a go inside the window before propagating, and disclose it in the PR body |
 | `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
@@ -740,6 +783,24 @@ x. **Sandbox `/var/tmp` mode 755 breaks rootless image pulls** — containers/im
 y. **`mark-devkit autogen` defaults to `--sync=true`** — a review-side local run uploads generated
    artifacts (Rust/Go bundles) to the shared S3/minio mirror. Always pass `--sync=false` for
    review-side generation; the mirror upload belongs to the bot's post-merge job (§3.44).
+
+z. **A stray PENDING review by your own account silently blocks threaded replies** (kit-fixups#547
+   round 2, 2026-11-08): `POST pulls/<n>/comments/<id>/replies` fails `422 user_id can only have one
+   pending review per pull request` when an unsubmitted draft review exists on the PR (left behind by
+   an earlier failed/aborted comment attempt — invisible unless you sweep `pulls/<n>/reviews`). The
+   "ignore the draft" instinct is wrong once a reply is due: the draft must be DISMISSED
+   (`gh api -X DELETE repos/<org>/<repo>/pulls/<n>/reviews/<id>` — safe for your own empty-body
+   PENDING review), then the reply posts as an ordinary COMMENTED review record.
+
+aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11-09, three hits in one
+    session): `--jq '.[0:4]'` on releases made a live project look "frozen since 2022" and reached the
+    MAINTAINER in a public comment before the next probe found five modern semver releases (v1.4.0
+    published 2026-09 — the NAME looked old, the DATE was fresh: sort/compare on dates and shas, never
+    on version-name vibes); default pagination did the same to tags; a mis-sliced `--jq` silently
+    returned `[]` for "no PRs touching X". Rule: before any public or briefing claim of the form
+    "X does not exist / is frozen / has no Y", re-run unbounded (`?per_page=100`, no slice, raw length
+    printed) and quote the count. Correcting a posted public claim: own it in the same thread with the
+    evidence (the maintainer reply "I see regular tags" was exactly this catch).
 
 ## 8. Feedback sweep (do it between every task)
 
