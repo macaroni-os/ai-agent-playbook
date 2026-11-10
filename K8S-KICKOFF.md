@@ -28,6 +28,22 @@ net-kit, ANOTHER SESSION — never touch; #551 dev-python/ovs already merged, by
 Container `mark-contrib-862` still up (snapshot bootstrap-clean) — keep until reviews on #18 land, then
 `incus delete`.
 
+## 2026-11-10 morning — review wave answered (all threads closed)
+- Overnight feedback: #553 inline (simplify to `simple-github.tmpl` + `{{ .Values.sha }}`); #557 ×3
+  (same simplification + "I'm pretty sure that compile also with go 1.27"); #554–556 "Please, rebase"
+  (conflicted after #558–560 merged).
+- #554–556 rebased keep-both over the ovn-k atoms → heads `2a9d4f2fd`/`232265605`/`9da5afbc7`, MERGEABLE.
+- #553 → `e2a4c0a44`, #557 → `c5c4443c6`: template switch + COMMIT stamp rendered from `.Values.sha`
+  (probe: mark-devkit ≥0.36.1 sets sha = REAL TAG COMMIT sha — §3.35 rewritten; old
+  target_commitish warning survives only for `ignore_tags` repos), rebuilt green, qlist-identical.
+- **Go ceiling CONFIRMED** on 1.27.3 in BOTH GOTOOLCHAIN modes (my "auto downswitches" theory was
+  wrong — disproven and honestly reported in thread 4523360563); bound stays, both end-states offered.
+- Threaded replies 4523359732 / 4523360003 / 4523360311 / 4523360563; both bodies patched;
+  Closes still on #553 AND #557 (first merge fires). My "#55$((pr+1))" arithmetic slip in the rebase
+  replies fixed via PATCH to true #558/#559/#560 refs — §7 audit-before-post keeps earning its keep.
+- Playbook fed this branch: §2 `autogen-thin --to` bundle correction, §3.35 sha-semantics rewrite,
+  §4 ceiling row upgraded with probed GOTOOLCHAIN semantics.
+
 --- historical board below (kept for reference) ---
 
 Task: `[core-server-kit] autogen kubernetes and cillium stuff` — issue

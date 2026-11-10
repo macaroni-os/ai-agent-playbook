@@ -88,6 +88,11 @@ Known rough edges:
   are only produced by full `autogen --skip-merge --keep-workdir --sync=false` (the merge phase is
   skipped, so no converter is needed). `--sync=false` is mandatory locally — the default uploads
   generated artifacts to the shared S3/minio mirror (§3.44).
+  **Correction (mark-devkit 0.36.1 probe, 2026-11-10):** `autogen-thin --to <dir>` DOES run the
+  golang extension bundle build for a cluster that declares it — the whole proxy closure
+  downloads (~20 min/repo) and the repacked bundle tarball drifts ±200 B in size/digest per run
+  (the known nondeterminism) while distfile NAMES stay stable; budget for it on every spec
+  iteration.
 - If issue-filing experiments left **stale `/etc/portage/patches/<atom>/` dirs**, they
   double-apply against ebuild PATCHES and fail the build. Do not delete system state to verify —
   use a sandbox config: copy `/etc/portage` → `/root/pcr`, drop the stale dir there, run
@@ -331,12 +336,17 @@ Known rough edges:
      literal (§3.8/§3.15 principle applied to version literals too). When a source flavour must
      reference the exact tag build, stamp `{{ .Values.pv }}-{{ substr 0 7 .Values.sha }}` (sprig
      `substr`, already used in-repo by the fish cluster) — e.g. `-X main.Version=3.1.1-9db7df7`.
-     **BUT: `.Values.sha` is the GitHub release `target_commitish`, not a commit sha.** For a repo
-     using `ignore_tags: true` the releases' target_commitish is a branch name (mimir: literally
-     `main`), so the stamp renders `3.2.4-main` — for such repos fall back to plain `{{ .Values.pv }}`
-     (or a tag-pinned sha from elsewhere). The distfile auto-name suffix (`<pn>-<pv>-<sha7>.tar.gz`)
-     is the tag-object sha, which can differ from the unpack-root sha7 (peeled vs tag object) — the
-     `mv <user>-<repo>-*` wildcard in §3.36 absorbs either.
+     **BUT check the generator version:** mark-devkit ≥0.36.1 `builtin_github.go` sets
+     `sha = tag.Commit.GetSHA()` — the 40-char TAG COMMIT sha — whenever the tag resolves
+     (probed live on kube-ovn + ovn-kubernetes, kit-fixups#553/#557 round 2, 2026-11-10: renders
+     the real commit on all six tracks, and the maintainer explicitly prefers
+     `COMMIT={{ .Values.sha }}` over any unpack-time sha stash). The older trap stands only for
+     the `ignore_tags: true` fallback, where sha falls back to the release `target_commitish`
+     and can be a BRANCH name (mimir: literally `main`) — there, fall back to plain
+     `{{ .Values.pv }}`. Related edge proven the same day: an ANNOTATED tag's recovered tarball
+     unpack root is named by the tag-OBJECT sha while the distfile auto-name suffix
+     (`<pn>-<pv>-<sha7>.tar.gz`) carries the commit sha — the `mv <user>-<repo>-*` wildcard in
+     §3.36 absorbs either, but never stash `${d##*-}` from the unpack dir as "the commit".
  36. **Source flavour = generator tarball recovery + `post_src_unpack`, assets live under `-bin`**
      (settled convention, macaroni-os/kit-fixups#514 review, geaaru 2026-11-01, verified on
      tempo/loki/mimir): do NOT list the GitHub `archive/refs/tags/...` tarball as an explicit source
@@ -548,7 +558,7 @@ Known rough edges:
 | `ebuild manifest` dies on a USE-gated distfile whose USE is OFF | the manifest phase fetches EVERY conditional SRC_URI regardless of USE — one dead optional-module host blocks the whole conversion (nginx `sticky`'s bitbucket tarball 404s today, aborting even the 1.26.2 manifest). Fetch-probe every module tarball as part of the reproduce step; dead host → repoint to a mirror of the SAME pinned commit (align `mod_p`/`mod_wd` to that archive's unpack root) or drop the module with justification (kit-fixups#513) |
 | "upstream has no GitHub releases" — memory or a stale repo page | verify live before falling back to `builtin-dirlisting`: `gh api repos/<u>/<r>/releases`. nginx had quietly published the official tarballs as release assets (nginx.org tarball + `.asc`, current through the security lines) and the whole #849 spec flipped from dirlisting to `builtin-github` on one API call. Branch/tag listings are NOT evidence about releases |
 | `go: go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)` — builds on unstable, fails on a release branch | inherit `go-module` (§3.37): its `src_prepare` rewrites the go.mod directive to the local toolchain; do NOT version-pin or downgrade the source to appease a tree |
-| Go package compiles on OLDER go but dies on the NEWEST with `undefined:` errors inside vendored deps (e.g. kube-openapi `go-json-experiment` shim on go ≥1.27) | a toolchain **ceiling**, not a floor — §3.37's rewrite only ever helps downward; bound `BDEPEND ">=dev-lang/go-A <dev-lang/go-B"` from the upstream's pinned `toolchain` directive / CI and disclose it in the PR body (ovn-kubernetes spec, macaroni-os/kit-fixups#557; verify every release branch actually carries a version inside the window before propagating) |
+| Go package compiles on OLDER go but dies on the NEWEST with `undefined:` errors inside vendored deps (e.g. kube-openapi `go-json-experiment` shim on go ≥1.27, kit-fixups#557 round 2) | a toolchain **ceiling** BDEPEND bound (`>=dev-lang/go-A <dev-lang/go-B`) — from the upstream's pinned `toolchain` directive / CI — is the house answer when the committed `vendor/` can't be fixed from the ebuild; `GOTOOLCHAIN=auto` is NOT an escape (the `toolchain` line only switches when local < the `go` directive — a newer local never downswitches; PROBE both modes before conceding a maintainer's "CI builds it fine"), verify every release branch carries a go inside the window before propagating, and disclose it in the PR body |
 | `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
