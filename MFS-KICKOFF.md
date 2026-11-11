@@ -95,6 +95,11 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
    anise-build represents “build inside the assembled chroot” (dependency image
    + `chroot ${MFS}` steps + per-package payload dir) and propose it in a PR
    comment/Discord for geaaru to choose (§9) before writing a batch of specs.
+   **Blocker filed:** anise issue #37 (https://github.com/macaroni-os/anise/issues/37)
+   — anise-build steps cannot mount `/proc` or `mknod` `/dev` (captured
+   `MOUNT-FAIL`/`MKNOD-FAIL` even with the default `--privileged`); wait for the
+   maintainer's call on privileged build steps, or fall back to building step2
+   outside the chroot with `--sysroot=${MFS}`.
 3. After the ch.7 structure is agreed: implement the temporary tools as step2
    packages, then close step1 with `step1/sources` (package_dir `${MFS}/sources`,
    requires the full step1 set; ask whether it rides the last tools PR or lands
