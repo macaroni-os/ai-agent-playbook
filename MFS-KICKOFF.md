@@ -21,28 +21,28 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 - Isolated build sandbox: **`mfs-build`** (unprivileged, `default` + `docker` profile,
   own btrfs daemon) — created 2026-11-06 because a second agent session shares `mfs-dev`
   and swaps its daemon (XFS/btrfs benchmarks), killing in-flight builds. Snapshot
-  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain), `step1-pass2-green` and
-  `step1-pass2-green-r2` (clean 26/26 through gcc-pass2, after the review rounds).
+  `step1-makeopts-green` (clean 24/24 MAKEOPTS chain), `step1-pass2-green`,
+  `step1-pass2-green-r2` and `step1-pass2-dropintree-green` (clean 27/27 through
+  gcc-pass2; the last one after the GMP/MPFR/MPC decision).
   Use `mfs-build` for macaroni-fs
   builds; leave `mfs-dev` to the other session.
-- Repo: `/root/macaroni-fs`, master `7ddee9a` (PR #6 merge); active branch
-  `step1-pass2`, HEAD `311ee7b` (two commits on `7ddee9a`). Remotes
-  `upstream` (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
+- Repo: `/root/macaroni-fs`, master `a0f102d` (PR #7 merge); `step1-pass2`
+  (`341c339`) is merged and stale. Remotes `upstream`
+  (macaroni-os/macaroni-fs) + `fork` (org-tekeli-borisp/macaroni-fs).
   Build invocation: `make build PACKAGES=<cat>/<name> BACKEND=docker REPO_CACHE=`
   — always verify artifacts (rc=0 lies, §10.2/§7 class).
-- macaroni-os/macaroni-fs: PR #1–#6 MERGED (PR #4 `d50cac4`, PR #5 `e7bd201`,
-  PR #6 `7ddee9a`, 2026-11-06). **PR #7 OPEN** — head `328c626`
-  (https://github.com/macaroni-os/macaroni-fs/pull/7): `step1/binutils-pass2`
-  (2.46.0) and `step1/gcc-pass2` (16.2.0); clean 26/26 chain plus a real chroot
-  C and C++ compile/run, `whip` green. Review rounds applied: no redundant
-  downloads, one `export` per line, stale pass-1 source tree removed before
-  unpacking; the `--with-gmp/--with-mpfr/--with-mpc=${MFS}/cross-tools` probe
-  builds but leaves `cc1` needing `libmpc.so.3`/`libmpfr.so.6` in the chroot,
-  so the book's in-tree copies stay. Open questions in the body: binutils
-  2.47 book drift, `coreutils` 6.5 gap, empty `/usr/lib64` from base.
-- macaroni-os/ai-agent-playbook: PR #11/#12/#13 MERGED (PR #13 as `0a1c3be`),
-  PR #14 (per-session containers, `a4ed3af`) also merged; this refresh is a new
-  PR. Refresh this file at the end of every session; /tmp drafts die on reboots.
+- macaroni-os/macaroni-fs: **step1 is complete — PR #1–#8 MERGED** (PR #4
+  `d50cac4`, PR #5 `e7bd201`, PR #6 `7ddee9a`, PR #7 `a0f102d`, PR #8
+  `0e32e73`; 2026-11-06/08/11). Master is `a0f102d`; the 27-package chain ends
+  at `step1/gcc-pass2` (binutils 2.46.0, gcc 16.2.0). GMP/MPFR/MPC are not
+  unpacked in-tree: the step1 packages provide the build-machine copies under
+  `${MFS}/cross-tools`, and the chroot must export
+  `LD_LIBRARY_PATH=/cross-tools/lib` (without it `cc1` fails on
+  `libmpc.so.3`, captured). Remaining step1 follow-ups: binutils 2.47 book
+  drift and the empty `/usr/lib64` created by base.
+- macaroni-os/ai-agent-playbook: PR #11–#15 MERGED (PR #13 `0a1c3be`,
+  PR #14 `a4ed3af`, PR #15 `4f9de49`); PR #20 carries this refresh.
+  Refresh this file at the end of every session; /tmp drafts die on reboots.
 - **Book ↔ stage mapping**: `step1` is LFS ch.5 + ch.6 (cross toolchain +
   cross-compiled temporary tools, ending at `gcc-pass2`); `step2` starts at
   ch.7 (enter chroot + additional temporary tools) and continues into ch.8.
@@ -84,16 +84,21 @@ Read PLAYBOOK.md first — §10 is the macaroni-fs loop, §5/§6/§7/§8 apply a
 ## Task order
 1. §8 sweep FIRST — upstream master drift (`git fetch upstream` in the sandbox;
    geaaru pushes seeds/specs directly — rebase before any push) and any new review
-   activity on the just-merged PR #5/#6 or open PR #7. All three endpoints, always.
-2. PR #7 carries the pass-2 tools; when reviewed, implement the ask or reply with a
-   probe (§6 both-end-state style). Open questions in the body: binutils 2.46 vs the
-   book's 2.47 (parity vs bump-both), the `coreutils` 6.5 gap, and the empty
-   `/usr/lib64` still created by `step1/base`.
-3. After PR #7 merges: ch.6 is complete. Next is the ch.7 territory — enter-chroot
-   structure and the additional temporary tools — plus the structural step2/
-   decisions; pull exact procedures from the rolling book and propose in PR comments
-   (§9). Then close the loop with `step1/sources` (package_dir `${MFS}/sources`,
-   requires the full step1 set; ask whether it rides the last tools PR or lands alone).
+   activity on the merged PRs. All three endpoints, always.
+2. Step1 is complete. Next is the **ch.7 / step2 bootstrap**, which is a structural
+   decision, not a spec batch: the chroot entry needs
+   `LD_LIBRARY_PATH=/cross-tools/lib` for the pass-2 compiler, the missing `/bin`
+   plumbing (`/bin/bash`,`/bin/sh`), ownership/virtual-fs setup
+   (`changingowner`, `kernfs`), and then the temporary tools from the rolling
+   book: Gettext 1.0, Bison 3.8.2, Perl 5.44.0, Zlib 1.4, mpdecimal 4.0.1,
+   Python 3.15.2, Texinfo 7.3, Util-linux 2.42.4, then cleanup. Work out how
+   anise-build represents “build inside the assembled chroot” (dependency image
+   + `chroot ${MFS}` steps + per-package payload dir) and propose it in a PR
+   comment/Discord for geaaru to choose (§9) before writing a batch of specs.
+3. After the ch.7 structure is agreed: implement the temporary tools as step2
+   packages, then close step1 with `step1/sources` (package_dir `${MFS}/sources`,
+   requires the full step1 set; ask whether it rides the last tools PR or lands
+   alone).
 4. Nothing further for MAKEOPTS unless geaaru asks; keep the default `-j$(nproc)`
    (override via `.Values.makeopts`) and re-measure if the host core count changes.
 5. Beyond ch.6 (ch.7 equivalents, step2/): structural decisions — propose with
