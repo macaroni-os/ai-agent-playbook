@@ -979,10 +979,14 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
       (incl. `libgcc_s.so.1`) from landing in `${MFS}/usr/lib64` while the driver
       searches `/usr/lib` — consolidate into `/usr/lib` and drop `/usr/lib64` from the
       staged trees. Also `rm -rf` the pass-1 source tree before unpacking, or stale
-      objects from pass 1 can leak into pass 2. The in-tree GMP/MPFR/MPC copies are
-      required too: pointing `--with-gmp/--with-mpfr/--with-mpc` at
-      `${MFS}/cross-tools` builds green but leaves the installed `cc1` needing
-      `libmpc.so.3`/`libmpfr.so.6` (not found in the chroot, verified 2026-11-07).
+      objects from pass 1 can leak into pass 2. GMP/MPFR/MPC: the book unpacks them
+      in-tree, but the team chose the anise-tracked package path instead (review
+      2026-11-08): build them as packages under `${MFS}/cross-tools`, configure
+      `--with-gmp/--with-mpfr/--with-mpc=${MFS}/cross-tools`, and make the chroot
+      export `LD_LIBRARY_PATH=/cross-tools/lib`. Without that variable the installed
+      `cc1` dies on `libmpc.so.3` (verified 2026-11-07); with it the C/C++ chroot
+      compile passes. With no `--with-*` flags at all, configure stops with
+      “Building GCC requires GMP 4.2+, MPFR 3.1.0+ and MPC 0.8.0+”.
       Proof bar: a real chroot C **and** C++ compile+run (add a test-only
       `/lib/ld-linux-x86-64.so.2` link because the loader lives in `/usr/lib`).
 8. **Reproduce pristine, once per hypothesis**: reusing a build dir across in-tree/out-of-tree
