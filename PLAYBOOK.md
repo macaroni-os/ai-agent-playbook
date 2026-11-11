@@ -915,6 +915,9 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
 5. **House spec pattern (double install)**: live `make DESTDIR=${MFS} install` + payload
    `make DESTDIR=/step1/<pn>${MFS} install`, `package_dir: /step1/<pn>/mfs`. Anything the
    build fixes post-install (compat symlinks, seds) must be applied to BOTH trees.
+   **Clean the payload dir first** — `rm -rf /step1/<pn>/*`, not `mkdir -p`: the directory
+   can already exist with files from an earlier build, and those stale files would land in
+   the anise package (geaaru on macaroni-os/macaroni-fs#7, 2026-11-11).
    Vendored patches live in the package dir and arrive injected at `/anisebuild/` — stage
    them into `${MFS}/sources/patches/` (maintainer architecture: a future `step1/sources`
    capture package ships them to step2 so nothing re-vendors; PR #2 review).
