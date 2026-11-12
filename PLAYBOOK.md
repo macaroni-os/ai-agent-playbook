@@ -52,6 +52,14 @@ double-quoted host string. Long-running commands: set your agent tool's timeout 
 (~900000 ms for emerge; the default will kill builds mid-compile).
 
 Known rough edges:
+- The `macaroni/mark-unstable` image family has **no `/root` at first boot** (same quirk as
+  phoenix-builder, §10.1): every redirect into `/root/` dies with `No such file or directory`
+  and silently kills the detached command whose log it was (observed 2026-11-12: the first
+  `ego sync` never started). `mkdir -p /root` before anything writes there. And `incus launch`
+  inside the piped-`newgrp` wrapper **swallows the remaining stdin** — the next line is parsed
+  as instance config (`cannot construct !!str … into api.InstancePut`) — append `</dev/null`
+  to `incus launch`. Where the operator's account has direct incus access, plain
+  `incus exec <c> -- bash -c "…"` needs no newgrp pipe at all — probe once, per machine.
 - `incus file pull/push` (SFTP) may fail (307 redirect / missing agent). Workaround: base64 in
   chunks (`echo <B64> | base64 -d > f`); huge single-arg base64 hits ARG_MAX — split.
 - MARK's `emerge` rejects bare `=cat/pkg` atoms: use exact versions or plain atoms.
@@ -419,7 +427,7 @@ Known rough edges:
       **DIST-only** (0 `^EBUILD` lines kit-wide; this portage's `ebuild manifest` preserves that
       shape — a content-only fix yields an ebuild-only diff, matching the bot's own bump PRs);
       `ebuild manifest` must run in the real git-managed kit copy (fails as `::x-root` in
-      scratch dirs). Proof bar: generated ebuilds `cmp`-identical to `/var/db/pkg/<cat>/<pn>-<pv>/<pn>.ebuild`
+      scratch dirs). Proof bar: generated ebuilds `cmp`-identical to `/var/db/pkg/<cat>/<PF>/<PF>.ebuild`
       (§5.2) or to what you built; `-bin` trees regenerate byte-identical.
 
  41. **Go bundles v2 (mark-devkit ≥0.36.0): `gosum_paths` + `markdevkit_min_version`**
@@ -550,6 +558,7 @@ Known rough edges:
 | `aclocal: You must have libxml2 …` after a libxml2 upgrade | libxml2 ≥ 2.12 stopped installing the `AM_PATH_XML2` m4 macro — replace with `PKG_CHECK_MODULES([XML2],[libxml-2.0])` (dvdauthor pattern); the error text is a red herring, libxml2 IS installed |
 | PEP517 wheel build imports the package itself (autocomplete/index generation) | every runtime dep is also a BUILD-time dep — declare them all (`_build_ac_index` awscliv2 pattern); a wheel phase failing on ModuleNotFoundError of a "runtime-only" dep is a spec bug |
 | Python dep dies at build with `TypeError: unsupported operand type(s) for \|` | that dep's own `Requires-Python` exceeds the distro interpreter (urllib3 ≥2.7 wants ≥3.10 vs tree py3.9; PEP604 unions evaluated at import). Version caps are then MANDATORY, not conservatism — prove it once by removing the cap and building (capture the TypeError), encode the cap with the rationale as a YAML comment (never in the dep string, §3.22) |
+| autogen `PYTHON_COMPAT` picks a python the tree refuses to merge | house convention is `PYTHON_COMPAT=( python3+ )` (tree-wide: 962 ebuilds) — core-kit's profile mask `funtoo-kit-python` hides `>=dev-lang/python-3.10`, so pinning `python3_11` by the kit's HEADLINE ebuilds is wrong; check the mask, then resolve (`python_single_target_python3_9` is the live target, vim #868 2026-11-12) |
 | `.jar` (or other zip-magic) distfile explodes into WORKDIR at unpack | portage auto-unzips by file magic — `src_unpack() { cp "${DISTDIR}/${A}" "${WORKDIR}"/ \|\| die; }` and install the intact archive (jq-bin/plantuml pattern) |
 | custom-make package dies with a bizarre guard error only under portage (e.g. Firebird examples `ifndef ROOT` → extauth fatal) | Portage exports `ROOT=/`; upstream makefiles using bare `ROOT` collide — `unset ROOT` in `src_compile` (or `emake ROOT=`) and comment-cite the issue |
 | upstream ships staged libs as absolute libtool symlinks into the build tree (libtommath/libtomcrypt pattern) | `cp -L` the real objects at install time — clean/merge phases dereference dangling symlinks later |
@@ -571,7 +580,9 @@ Known rough edges:
    → **0 errors** → `qlist -Iv` → functional smoke (binary `--version`/`-V`, link test, upstream
    `runtests.sh`/ctest, rebuild one cheap reverse dep if <5 min).
    **Byte-identity oracle:** portage installs the *exact* ebuild it used to
-   `/var/db/pkg/<cat>/<pn>-<pv>/<pn>.ebuild` — `cmp` a freshly generated ebuild against it to
+   `/var/db/pkg/<cat>/<PF>/<PF>.ebuild` — the file name carries `-rN` when the ebuild has a
+   revision (vim-core session 2026-11-12: observed `<PF>.ebuild`, not `<pn>.ebuild`) —
+   `cmp` a freshly generated ebuild against it to
    prove "generated now == built back then" with no digests/binpkgs needed (§3.40 proof bar).
 3. Port the change to a kit-fixups branch → verify the **generated** ebuild via
    `mark-devkit autogen-thin --specfile autogen.kit.d/base.yml --kitfile <merge file> --pkg <PN>`
@@ -589,7 +600,7 @@ Known rough edges:
    `mirror://macaroni/…-mark-*-bundle-…` distfile stays unfetched. Generate it with full
    `autogen --skip-merge --keep-workdir --sync=false … --to <dir>`, stage `<dir>/downloads/*` into
    DISTDIR, then `emerge -1` (§3.44); finish with the `cmp` byte-identity check against
-   `/var/db/pkg/…/<pn>.ebuild` (§5.2).
+   `/var/db/pkg/…/<PF>.ebuild` (§5.2).
 4. Restore sandbox state (git checkout per kit, remove test dirs, shred temp token files).
 5. Only then: PR / review replies with the captured evidence (PR body carries the
    `Closes:`/`Bugs:` line per §3.23; label the PR `ai_ass` where the repo defines it, §3.39).
@@ -711,7 +722,11 @@ p. Cross-repo references have TWO traps. (1) Bare `#NNN` resolves **in the repo 
    `bodyHTML` (`pullRequest(number:N){ bodyHTML }`). Two review-thread API quirks (2026-11-02):
    `PullRequest` has no `reviewComments` connection — render-audit a review comment by fetching
    its REST `node_id` and querying `node(id:)`; and a reply is GET-able only at
-   `pulls/comments/<id>` (the nested `pulls/<n>/comments/<id>` form 404s).
+   `pulls/comments/<id>` (the nested `pulls/<n>/comments/<id>` form 404s). Render-audit scan
+   rule (kit-fixups#567, 2026-11-12): audit TEXT nodes, not raw `bodyHTML` — GitHub wraps the
+   `Closes` keyword in a span whose `aria-label` reads "This pull request closes issue #NNN.",
+   so a naive `#\d+` sweep over the HTML fires a false positive on EVERY well-formed closing
+   line; strip tags/attributes first, then apply the §7p owner/repo-strip rule.
 q. `bash -n` is NOT a functional gate: `declare -A mod{pn,pv}` brace-expands to `modpn`/`modpv`
    — the associative arrays are silently never created, `${!mod_pn[@]}` comes back empty, the
    `IUSE+=` loops no-op, and portage then masks the ebuild (`USE flag … not in IUSE`) while every
