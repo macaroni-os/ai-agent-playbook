@@ -202,7 +202,9 @@ Known rough edges:
 17. Prefer a simple `string` transform over regex when the release titles allow it (match the real
     title format — read a few titles first: "libnl 3.12.0" needs only `match: 'libnl '`).
 18. Provenance comments in generated ebuilds say **Mark**, never Gentoo/Funtoo ("Drop old Gentoo
-    reference and replace them with Mark"). USE flags gating packages not in the tree get
+    reference and replace them with Mark"). User-visible DISTRO STAMPS however say **MacaroniOS**
+    (`--with-modified-by=Mark-…` → `--with-modified-by=MacaroniOS-…`, geaaru ask on
+    macaroni-os/kit-fixups#567, 2026-11-12). USE flags gating packages not in the tree get
     simplified to the house equivalent (no `libressl` in tree → plain `ssl? ( dev-libs/openssl:= )`).
 19. Org commits carry an attribution trailer block (requested on macaroni-os/ai-agent-playbook#1):
     `LLM-assisted-by: <model id (size, location)> via <agent harness>` plus
