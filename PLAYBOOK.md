@@ -547,7 +547,7 @@ Known rough edges:
      are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
 
- 50. **Epic issue → per-package child issues is the accepted division-of-labor shape**
+ 52. **Epic issue → per-package child issues is the accepted division-of-labor shape**
      (mark-issues#880, geaaru 2026-11-14: "This the list that we can use to create children issue
      of the present issue … Anyone want helps, keep a package, open an issue and do the job. Agent,
      maybe you can help on open issues"): one child issue per package directory, title
@@ -895,6 +895,18 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     with a single `$` silently no-ops the substitution — the build stays green, the installed
     behavior breaks (§7q family: syntax passes, semantics dead). Diff generated-vs-tree at character
     level for every sed/awk line, not just visually.
+ dd. **Two sessions on ONE GitHub account make merged work look like someone else's — and a
+    cancelled subagent may have already shipped** (core-kit #880 loop, 2026-11-14/15): a diffutils
+    subagent was cancelled "because the package was already merged" — but PR #584 was that very
+    subagent's own pushed-and-merged commit (merged 71 s after opening; the cancel killed only the
+    report). After any cancel/crash, before any conclusion or re-dispatch: compare the fork branch
+    sha, the container worktree commit, and `pulls/<n>/head.sha` — identity proves ownership of
+    "mystery" work. Re-check issue state + PR search IMMEDIATELY before dispatch, not only at
+    claim time; claims in the other session's transcripts are invisible to your board. The
+    ownership discriminator is the commit TRAILER, not the account: process review comments ONLY
+    on PRs whose head commit carries YOUR `LLM-assisted-by: <your model id>` — foreign-trailer
+    PRs (#581 zlib was GLM-5.3-Flash) belong to their session even under the same author; a
+    "takeover" of one was cancelled mid-flight before it touched anything.
 
 ## 8. Feedback sweep (do it between every task)
 
