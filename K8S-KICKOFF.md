@@ -28,6 +28,16 @@ net-kit, ANOTHER SESSION — never touch; #551 dev-python/ovs already merged, by
 Container `mark-contrib-862` still up (snapshot bootstrap-clean) — keep until reviews on #18 land, then
 `incus delete`.
 
+## 2026-11-10 afternoon — ONLY #557 LEFT
+kube-ovn + propagations (#553–556) MERGED 13:32–13:36Z; #862 auto-closed by #553's `Closes:` two
+seconds later — recovery status comment posted (#issuecomment-6770340754). geaaru accepted the go
+ceiling as-is ("Really, weird. Moving ahead as-is for now") — bound + one-line relax path live in
+the spec comment. #557 rebased keep-both over the merged kube-ovn atoms (+blank-line seam fix),
+selections re-proved 1.4.0/1.3.0/1.2.0 ×2, new head `e2f102cd6` MERGEABLE; rebase reply comment
+6770329480 + threaded ack r4526260880. Merged board now: #525, #530–556, #558–560, commons #4/#5;
+open: kit-fixups #557 + playbook PR #18. Loop ends when #557 merges; container mark-contrib-862
+can then be deleted (keep until #18 lands too).
+
 ## 2026-11-10 morning — review wave answered (all threads closed)
 - Overnight feedback: #553 inline (simplify to `simple-github.tmpl` + `{{ .Values.sha }}`); #557 ×3
   (same simplification + "I'm pretty sure that compile also with go 1.27"); #554–556 "Please, rebase"
