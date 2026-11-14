@@ -14,6 +14,7 @@ the conventions the maintainers actually asked for.
 | [PLAYBOOK.md](PLAYBOOK.md) | the full playbook: sandbox setup, maintainer conventions, fix-pattern table, verification standard, subagent operating model, known agent failure modes, macaroni-fs stage1/stage2 spec work (§10) |
 | [KICKOFF.md](KICKOFF.md) | short prompt to hand a fresh agent session so it boots the loop from the playbook |
 | [MFS-KICKOFF.md](MFS-KICKOFF.md) | living session-handoff for the macaroni-fs (§10) loop: board state + task order — refresh it every session so a reboot can't erase it |
+| [COREKIT-KICKOFF.md](COREKIT-KICKOFF.md) | living session-handoff for the core-kit autogen epic (mark-issues#880) loop: child-issue board + sandbox map + task order — refresh every session |
 
 ## Quick start
 1. `git clone` this repo on your workstation.

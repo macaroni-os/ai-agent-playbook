@@ -532,6 +532,25 @@ Known rough edges:
      are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
 
+ 50. **Epic issue → per-package child issues is the accepted division-of-labor shape**
+     (mark-issues#880, geaaru 2026-11-14: "This the list that we can use to create children issue
+     of the present issue … Anyone want helps, keep a package, open an issue and do the job. Agent,
+     maybe you can help on open issues"): one child issue per package directory, title
+     `[<kit>] autogen \`<cat>/<pn>\``, labels copied from the epic (MARK, <kit>, new_autogen,
+     mark-unstable, mark-xl, mark-iii, mark-31, mark-i, mark-v); the body carries the captured tree
+     versions, the conversion precedent PR, and a `**Note:**` only where a maintainer decision is
+     pending (slots/EOL/no-upstream/dormant). Link them as GitHub sub-issues:
+     `gh api repos/macaroni-os/mark-issues/issues/<epic>/sub_issues -X POST -F sub_issue_id=<id>` —
+     `sub_issue_id` is the issue's numeric `id` from the create response, NOT the `number`, and must
+     be sent `-F` typed-integer (`-f` string → 422 "not of type integer"). Labels array likewise:
+     `gh api ... -F labels='[...]'` 422s as "not an array" — build the JSON with jq and pipe to
+     `--input -`. Claim a package with a comment on its child issue, work it, and put
+     `Closes: macaroni-os/mark-issues#<child>` in the PR BODY (the epic stays open; each child dies
+     with its own merge). Spec conversions need NO release-branch follow-up PRs: the kit-fixups
+     release branches carry only merge-atom recipes pointing at `kit@mark-unstable` (verified on
+     mark-xl/iii/31 after util-linux macaroni-os/kit-fixups#573 merged — restates §3.38); the
+     per-branch `mark-*` labels on the children describe propagation, not extra PRs.
+
 
 ## 4. Fix-pattern quick table
 
@@ -607,6 +626,17 @@ Known rough edges:
   push. Sequential subagents *within* a session are not enough: a second concurrent session gets
   its own container, and the session that does NOT own the loop's repo leaves its living docs
   (e.g. MFS-KICKOFF.md) to the owner.
+  Symptom on the kit-fixups loop (core-kit #880, 2026-11-14): the shared `/kit-fixups` checkout
+  switches to a foreign branch mid-task and the working tree grows mixed hunks. Countermeasure
+  while contaminated: capture evidence, remove ONLY your hunks from the shared copy, build/commit
+  your PR from an isolated `git worktree` (never the shared checkout), and prove PR purity via
+  `pulls/<n>/files`. To honor the rule cheaply, clone the live sandbox on demand —
+  `incus publish <CONTAINER>/clean-base --alias contrib-base` (reads only the snapshot; the other
+  session keeps running) → `incus launch contrib-base <NEW-NAME>` → sanity-probe `/kit-fixups`
+  (git identity, porcelain), kit trees clean, `mark-devkit --version`, egress → pull kit-fixups to
+  current head → `incus snapshot delete <NEW-NAME> clean-base && incus snapshot create <NEW-NAME>
+  clean-base`. Keep the snapshot name identical across sandboxes so briefings stay portable, and
+  say in every briefing WHICH container it owns and that touching the other is forbidden.
 - Each briefing includes verbatim: §2 exec/credential recipes, §3 conventions (numbered list is
   compact), §5 checklist, reference PRs to imitate (`gh pr diff <N> --repo macaroni-os/kit-fixups`
   works for merged ones), and the escape hatch: “stale/maintainer-decision → STOP, report with
@@ -801,6 +831,17 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     "X does not exist / is frozen / has no Y", re-run unbounded (`?per_page=100`, no slice, raw length
     printed) and quote the count. Correcting a posted public claim: own it in the same thread with the
     evidence (the maintainer reply "I see regular tags" was exactly this catch).
+ bb. **Read the tree Manifest for distfile FILENAMES — not your eyes on the listing** (gzip #884,
+    2026-11-14): a spec assuming `gzip-<ver>.tar.gz` from the upstream listing misses that the tree
+    (and the listing tip) ship `.tar.xz` — the Manifest DIST line is the ground truth for the name
+    the ebuild expects, and it doubles as the mirror bit-identity proof (GARR sha512 == tree
+    Manifest). Anchoring the dirlisting matcher on `\.tar\.xz$` then structurally filters the
+    sibling `.sig`/`.zip`/`.tar.gz` assets for free.
+ cc. **`$$` automake escapes in tree-ebuild sed/awk payloads survive into the spec body verbatim**
+    (gzip #884): the tree `src_prepare` sed carried `$$source`/`$$dest` (od-confirmed); rendering it
+    with a single `$` silently no-ops the substitution — the build stays green, the installed
+    behavior breaks (§7q family: syntax passes, semantics dead). Diff generated-vs-tree at character
+    level for every sed/awk line, not just visually.
 
 ## 8. Feedback sweep (do it between every task)
 
