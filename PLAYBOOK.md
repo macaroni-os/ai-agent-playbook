@@ -92,7 +92,10 @@ Known rough edges:
   golang extension bundle build for a cluster that declares it — the whole proxy closure
   downloads (~20 min/repo) and the repacked bundle tarball drifts ±200 B in size/digest per run
   (the known nondeterminism) while distfile NAMES stay stable; budget for it on every spec
-  iteration.
+  iteration. Confirmed for the **Rust** extension on the same 0.36.1 (#865 net-fs/rustfs,
+  2026-11-11): autogen-thin produces the `mark-rust-bundle` tarball AND its generated Manifest —
+  because of the re-tar drift, re-stage bundle + Manifest into DISTDIR **as a set**, never one
+  against the other's older digest.
 - If issue-filing experiments left **stale `/etc/portage/patches/<atom>/` dirs**, they
   double-apply against ebuild PATCHES and fail the build. Do not delete system state to verify —
   use a sandbox config: copy `/etc/portage` → `/root/pcr`, drop the stale dir there, run
@@ -467,6 +470,8 @@ Known rough edges:
       `cmp` identity between the installed `/var/db/pkg/…` ebuild and the generated one (§5.2).
       **Never run a review-side `autogen` with the default `--sync=true`**: it uploads generated
       artifacts to the shared S3/minio mirror, which belongs to the bot's post-merge job.
+      *(Correction on mark-devkit 0.36.1: per the §2 note, `autogen-thin --to` now runs golang
+      AND rust extensions — full `autogen` remains the proven route for shipped artifacts.)*
 
  45. **cgit-only upstreams are trackable with `builtin-dirlisting` on the cgit tags page**
       (passt, #861). passt has no GitHub/Forgejo/GitLab repo, but
@@ -533,6 +538,35 @@ Known rough edges:
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
 
 
+ 50. **Rust MSRV floor: probe the gate before conceding, propagate per the branch's rust ceiling**
+      (net-fs/rustfs #865, kit-fixups#564/#565/#566, 2026-11-11): upstream declared
+      `rust-version = "1.99.0"` + `edition = "2024"` while lang-kit topped out at rust-bin 1.98.1.
+      The cargo error `rustc 1.98.1 is not supported by the following packages` is only the
+      *declaration gate* — edition 2024 compiles on ≥1.85 — so the house answer is
+      `cargo_src_configure --ignore-rust-version` (cargo.eclass has NO `CARGO_IGNORE_RUST_VERSION`
+      var; positional args land in `ECARGO_ARGS` and reach every cargo phase) with a YAML comment
+      citing the upstream MSRV and the verified tree version, disclosed in the PR body. Distinguish
+      gate-fail from real-compile-fail, and probe EACH release branch's actual rust-bin ceiling
+      (`git ls-tree` the lang-kit branch): mark-xl/mark-31 at 1.96.1 → `cargo check
+      --ignore-rust-version` green → propagated; mark-iii at 1.94.0 → real
+      `error[E0658]: use of unstable library feature 'cfg_select'` in sysinfo → NOT propagated,
+      disclosed in the issue comment pointing at the open lang-kit bump PR as the enabler. Never
+      bump the lang-kit compiler inside a package PR (§9).
+ 51. **Two upstream-Rust shapes break `mark-rust-bundle` generation — both fixed spec-side**
+      (rustfs #865): (a) git crates whose Cargo.lock rev lives on a NON-DEFAULT branch fail the
+      extension's single-branch clone (`error on checkout repo <x> for hash <sha>: object not
+      found`, prove the branch with a full clone + `git branch --contains`) — set
+      `extensions_defs.rust.opts.crates_git_single_branch: 'false'`; (b) a `[patch.crates-io]`
+      local crate SHARING a registry crate's name at a different version confuses the extension's
+      name-keyed local-crate detection and the registry version pinned in Cargo.lock is SILENTLY
+      dropped from the bundle (offline build: `failed to select a version for the requirement
+      'zstd = "^0.14.3"' … candidate versions found which didn't match: 0.13.4`) — prove it with a
+      Cargo.lock-registry-entries ↔ bundle-contents set-diff (rustfs: exactly 1 missing, 0 extra),
+      then re-add the missing `.crate` as an explicit `assets:` entry (main source asset
+      re-listed first per §3.32, version pinned in `vars:`) and feed it into the vendored registry
+      with the cargo eclass' own `_cargo_process_crate` in `src_unpack`. Upstream improvement ask:
+      key the local-crate detection by name+version.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -563,6 +597,8 @@ Known rough edges:
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
 | systemd unit models the API socket as `Environment=SOCKET=…` | upstream shape is a `.socket` unit + socket activation, with `EnvironmentFile=-/etc/conf.d/<pn>` only for `LOG_LEVEL`-style knobs (§3.46) |
+| `error: rustc X is not supported by the following packages: … requires rustc Y` | declaration gate ≠ compile fail: `cargo_src_configure --ignore-rust-version` (no eclass var — §3.50), per-branch ceiling probe, disclose; never bump the toolchain yourself (§9) |
+| silent `rustc` SIGABRT (exit 134, no diagnostics) on random tiny deps ONLY inside the portage sandbox | nested-container sandbox-IPC flake: control build the same tree unsandboxed + merge `FEATURES="-sandbox"`, disclose the full build-attempt tally in the PR body — do not touch the spec or add `restrict:` |
 
 ## 5. Verification standard (per PR)
 
