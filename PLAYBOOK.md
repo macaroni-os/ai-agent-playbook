@@ -567,6 +567,10 @@ Known rough edges:
      Maintainer stance confirmed the same session: entity-provenance comments in generated ebuilds
      are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
+     Whitespace follow-up (geaaru on kit-fixups#582, 2026-11-15): template-control lines in spec
+     bodies take the LEFT-TRIM form `{{-` (not `{{`) — with plain `{{` the directive's own newline
+     survives rendering and the generated ebuild carries stray empty lines; "Just a note for the
+     playbook for the next autogen".
 
  52. **Epic issue → per-package child issues is the accepted division-of-labor shape**
      (mark-issues#880, geaaru 2026-11-14: "This the list that we can use to create children issue
