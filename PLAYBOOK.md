@@ -84,6 +84,13 @@ Known rough edges:
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
 - **Never `shred -u` a script that bash is still executing** — the running wrapper's inode vanishes
   and the detached chain dies mid-phase without an error line. Detach a small launcher instead.
+- **`autogen-thin` with `GITHUB_TOKEN` unset fails SILENTLY** (patch #601, 2026-11-15): logs
+  `Missing git token! Push interrupted!` but **exits 0 and produces no output dir** — a generation
+  "success" with zero artifacts. Always assert the generated ebuild file exists (and is non-empty)
+  after every autogen-thin run, independent of rc, and treat an empty `--to` dir as a token-plumbing
+  failure (§2 `--env` position trap), not a generator bug. Same round's §7e-on-tooling near-miss: an
+  extraction that yields a **0-byte file** made a "clean" render-audit verdict vacuous — assert the
+  artifact backs the check BEFORE trusting a green (re-derive from raw, cf. §7v).
 - Detached-build polling: `pgrep -f "emerge --quiet-build"` ALSO matches the `bash -c` wrapper
   of the very exec call that runs the pgrep (the pattern is in its own command line) → phantom
   "STILL-RUNNING". Trust sentinels instead: log tail sentinels (`>>> Installing`, `Calculating
@@ -170,8 +177,17 @@ Known rough edges:
 8. Render-time template macros (`{{ .Values.pv }}`, `{{ .Values.p }}`, `regexReplaceAll …`) —
    NOT shell variables like `${PV}` — so generated ebuilds contain literals and read clean.
 9. House platform stance: **no multilib** (plain `autotools`/`cmake` eclasses, `cmake` supports
-   EAPI 7), **no FreeBSD** in `mark-*` branches, prefer simplicity when asked (dropping doc/test
-   USE + `src_test` is welcome; docs are read online; tests belong in workflows).
+   EAPI 7), **no FreeBSD** in `mark-*` branches, prefer simplicity when asked. **ALWAYS drop
+   `test` USE + `src_test` (and `restrict` added for it) in EVERY new autogen** — standing rule,
+   not a courtesy (geaaru, kit-fixups#586/#599/#601/#617, 2026-11-15: "Always drop `test` USE
+   for every new autogen. Add a note in the playbook"); docs read online, tests in workflows.
+   Ported bodies drop `userland_BSD`/`elibc_FreeBSD`/`elibc_Darwin` branches verbatim (same
+   review round, #601/#617).
+   **Always prefer an ebuild WITHOUT multilib support** — when a tree ebuild still carries
+   `multilib-minimal`/per-ABI machinery, collapsing it to a plain build is part of the
+   conversion, not an optional extra (maintainer ask on macaroni-os/kit-fixups#587 review,
+   2026-11-15; ncurses #923 hit the corollary too: the eclass pre-creates per-ABI `BUILD_DIR`
+   which a plain build then lacks — re-create what the eclass was providing or the phases break).
 10. Zip assets: add `app-arch/unzip` to `bdepend` explicitly. Don't spell out defaults
     (`query: releases` can be omitted).
 11. Rust/cargo packages: use the `rust` extension (`extensions_defs: rust` + package-level
@@ -204,10 +220,11 @@ Known rough edges:
     version and check the selection steps to the next candidate.
 17. Prefer a simple `string` transform over regex when the release titles allow it (match the real
     title format — read a few titles first: "libnl 3.12.0" needs only `match: 'libnl '`).
-18. Provenance comments in generated ebuilds say **Mark**, never Gentoo/Funtoo ("Drop old Gentoo
-    reference and replace them with Mark"). User-visible DISTRO STAMPS however say **MacaroniOS**
-    (`--with-modified-by=Mark-…` → `--with-modified-by=MacaroniOS-…`, geaaru ask on
-    macaroni-os/kit-fixups#567, 2026-11-12). USE flags gating packages not in the tree get
+18. Provenance strings in generated ebuilds: NEVER Gentoo/Funtoo, and the packager/distro
+    string is **`MacaroniOS`** — geaaru 2026-11-15 (kit-fixups#586/#599): "I prefer to use common
+    `MacaroniOS` string instead of `Mark`" — superseding earlier rounds' `Packaged by Mark`
+    (and the #567-era split where only DISTRO STAMPS used MacaroniOS: now everything does,
+    e.g. `--with-modified-by=MacaroniOS-...`). USE flags gating packages not in the tree get
     simplified to the house equivalent (no `libressl` in tree → plain `ssl? ( dev-libs/openssl:= )`).
 19. Org commits carry an attribution trailer block (requested on macaroni-os/ai-agent-playbook#1):
     `LLM-assisted-by: <model id (size, location)> via <agent harness>` plus
@@ -250,6 +267,10 @@ Known rough edges:
     Beware (freetds probe 2026-10-30): `github.match:` is evaluated against the RAW release
     title, NOT the title-transformed candidate — combining the two yields "No versions found".
     Prerelease/tag-page garbage is already filtered natively; don't add `match:` to rescue it.
+    SCOPE: `match:` is GITHUB-section only — `AutogenDirlistingProps` has NO Match field in
+    mark-devkit 0.36.1 (struct-proven, sys-devel/make macaroni-os/kit-fixups#611): a `match:`
+    inside a dirlisting block is SILENTLY INERT; use `dir.exclude` there. Discriminating probe
+    (uncapped vs capped selection) validates whichever key you write.
 25. Without an explicit `github.assets:` override the generator falls back to the
     `api.github.com` auto-generated source tarball, whose name differs from the uploaded asset
     (freetds: uploaded `freetds-<ver>.tar.bz2`). Set `assets:` when the uploaded asset name/
@@ -547,7 +568,7 @@ Known rough edges:
      are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
 
- 50. **Epic issue → per-package child issues is the accepted division-of-labor shape**
+ 52. **Epic issue → per-package child issues is the accepted division-of-labor shape**
      (mark-issues#880, geaaru 2026-11-14: "This the list that we can use to create children issue
      of the present issue … Anyone want helps, keep a package, open an issue and do the job. Agent,
      maybe you can help on open issues"): one child issue per package directory, title
@@ -625,8 +646,10 @@ Known rough edges:
 | Go package compiles on OLDER go but dies on the NEWEST with `undefined:` errors inside vendored deps (e.g. kube-openapi `go-json-experiment` shim on go ≥1.27, kit-fixups#557 round 2) | a toolchain **ceiling** BDEPEND bound (`>=dev-lang/go-A <dev-lang/go-B`) — from the upstream's pinned `toolchain` directive / CI — is the house answer when the committed `vendor/` can't be fixed from the ebuild; `GOTOOLCHAIN=auto` is NOT an escape (the `toolchain` line only switches when local < the `go` directive — a newer local never downswitches; PROBE both modes before conceding a maintainer's "CI builds it fine"), verify every release branch carries a go inside the window before propagating, and disclose it in the PR body |
 | `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
+| `builtin-dirlisting` selected but upstream home is an HTML **download page** (not an autoindex) | mark-devkit joins `dir.url + "/" + href` verbatim → a page URL yields `…/download.html/less-710.tar.gz` 404 + ZERO artifacts with rc 0 (§2 assert): keep the page as `dir.url` for version discovery but pin `assets[].url` with a `{{ .Values }}` template (precedents: libcap, elfutils, less macaroni-os/kit-fixups#605) |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
 | systemd unit models the API socket as `Environment=SOCKET=…` | upstream shape is a `.socket` unit + socket activation, with `EnvironmentFile=-/etc/conf.d/<pn>` only for `LOG_LEVEL`-style knobs (§3.46) |
+| one PN needs a **legacy CVE-served track + floating tip** simultaneously | multiple `packages:` entries for the SAME PN with per-entry `selector:` + `revision:` + `patches:` (gcc-cluster precedent; sys-devel/patch macaroni-os/kit-fixups#601 generated `2.7.6-r4` with 12 live patches AND the 2.8.1 tip from one `--pkg patch` run; `.Values.p` excludes `-rN`, so bumping a revisioned track keeps the distfile pair stable, §3.26) |
 | `error: rustc X is not supported by the following packages: … requires rustc Y` | declaration gate ≠ compile fail: `cargo_src_configure --ignore-rust-version` (no eclass var — §3.50), per-branch ceiling probe, disclose; never bump the toolchain yourself (§9) |
 | silent `rustc` SIGABRT (exit 134, no diagnostics) on random tiny deps ONLY inside the portage sandbox | nested-container sandbox-IPC flake: control build the same tree unsandboxed + merge `FEATURES="-sandbox"`, disclose the full build-attempt tally in the PR body — do not touch the spec or add `restrict:` |
 
@@ -674,7 +697,10 @@ Known rough edges:
   living-handoff file, producing contradicting commits on one PR branch that needed a corrective
   push. Sequential subagents *within* a session are not enough: a second concurrent session gets
   its own container, and the session that does NOT own the loop's repo leaves its living docs
-  (e.g. MFS-KICKOFF.md) to the owner.
+  (e.g. MFS-KICKOFF.md) to the owner. Same for working TREES: if a foreign living-doc file
+  appears untracked in your repo CWD (three core-kit loops shared one checkout 2026-11-15),
+  never commit, edit, or "reconcile" it — it encodes the OTHER loop's perception; re-sync your
+  own state from issues/PRs ground truth.
   Symptom on the kit-fixups loop (core-kit #880, 2026-11-14): the shared `/kit-fixups` checkout
   switches to a foreign branch mid-task and the working tree grows mixed hunks. Countermeasure
   while contaminated: capture evidence, remove ONLY your hunks from the shared copy, build/commit
@@ -710,7 +736,12 @@ Known rough edges:
 ## 7. Known agent failure modes (all actually observed — check before assuming gremlins)
 
 a. `gh api -f body=@file` does **not** expand `@file` → the literal path gets posted publicly.
-   Use `-f body="$(cat file)"` or `gh pr comment --body-file`. (Caught by human PR review; fix =
+   Use `-f body="$(cat file)"` or `gh pr comment --body-file`. Mirror failure (observed 2026-11-15
+   on mark-issues#908): a body with backticks inside **double quotes** command-substitutes → the
+   mangled text posts and reads as gibberish ("`cmp`-identical" → "-identical"). Safe pattern for
+   any body containing backticks/`$`: write it to a file and post via `--input` JSON
+   (`jq -n --rawfile b file '{body:$b}'`) or single-quoted heredoc; PATCH-edit such comments
+   immediately and re-fetch to confirm. (Caught by human PR review; fix =
    delete comment + repost real content as threaded replies.)
 b. Shell-quoting slips echoing `$(gh auth token)` into transcripts → rotate (`gh auth refresh`).
 c. EOF-append rebase conflicts in `<kit>/autogen.kit.d/base.yml` (several PRs append the same
@@ -895,6 +926,25 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     with a single `$` silently no-ops the substitution — the build stays green, the installed
     behavior breaks (§7q family: syntax passes, semantics dead). Diff generated-vs-tree at character
     level for every sed/awk line, not just visually.
+ dd. **Two sessions on ONE GitHub account make merged work look like someone else's — and a
+    cancelled subagent may have already shipped** (core-kit #880 loop, 2026-11-14/15): a diffutils
+    subagent was cancelled "because the package was already merged" — but PR #584 was that very
+    subagent's own pushed-and-merged commit (merged 71 s after opening; the cancel killed only the
+    report). After any cancel/crash, before any conclusion or re-dispatch: compare the fork branch
+    sha, the container worktree commit, and `pulls/<n>/head.sha` — identity proves ownership of
+    "mystery" work. Re-check issue state + PR search IMMEDIATELY before dispatch, not only at
+    claim time; claims in the other session's transcripts are invisible to your board. The
+    ownership discriminator is the commit TRAILER, not the account: process review comments ONLY
+    on PRs whose head commit carries YOUR `LLM-assisted-by: <your model id>` — foreign-trailer
+    PRs (#581 zlib was GLM-5.3-Flash) belong to their session even under the same author; a
+    "takeover" of one was cancelled mid-flight before it touched anything.
+    Two corollaries proven by the gmp #898 race (2026-11-15, ended STALE, zero public writes):
+    (a) **branch names must carry the model tag** (`gmp-autogen-898-qwen`) — the default
+    `<pkg>-autogen-<issue>` convention collides on the shared fork, and a push `rc=1
+    non-fast-forward` IS the race signal: `ls-remote` + read the foreign head commit's trailer
+    before anything else, STOP if it's not yours (force-pushing over a foreign-trailer branch is
+    forbidden); (b) keep the full verification package anyway (`/root/<pkg>*/`) — a STALE round's
+    evidence is directly reusable if the winning PR fails review.
 
 ## 8. Feedback sweep (do it between every task)
 

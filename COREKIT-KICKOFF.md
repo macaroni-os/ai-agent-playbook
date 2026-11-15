@@ -1,8 +1,8 @@
 # COREKIT-KICKOFF — core-kit autogen epic loop (macaroni-os/mark-issues#880)
 
 Living session-handoff for the #880 loop: board state + task order. **Refresh this every session**
-so a reboot can't erase it (same discipline as MFS-KICKOFF.md). Conventions: PLAYBOOK.md §3.50
-(epic→children workflow), §3 conversions, §5 verification, §6 one-container rule.
+so a reboot can't erase it (same discipline as MFS-KICKOFF.md). Conventions: PLAYBOOK.md §3.52
+(epic→children workflow, renumbered from 3.50 post-merge), §3 conversions, §5 verification, §6 one-container rule.
 
 ## Mission
 Epic: convert every legacy merge-only core-kit atom to an autogen spec in kit-fixups
@@ -13,26 +13,51 @@ the epic. Conversions need NO release-branch PRs (§3.38 + confirmed after #573:
 release branches carry merge-atom recipes pointing at `core-kit@mark-unstable`).
 
 ## Sandboxes (one-container rule, §6)
-- `mark-contrib` — shared/contested: in use by the session running the lz4 (#886 → PR #580) round.
+- Review-fix worktrees deliberately KEPT in `/kit-fixups/` at pushed heads: `less-autogen-910`,
+  `patch-autogen-920`, `sysvinit-autogen-912` — prune after each PR merges.
+- `mark-contrib` — shared/contested: in use by the GLM-5.3-Flash session (children #882 cpio +
+  #886 lz4 both MERGED; #926 zlib open with its own review thread — theirs to answer).
 - `mark-contrib-b` — this loop's dedicated clone (from the `contrib-base` image =
   `mark-contrib/clean-base` snapshot; kit-fixups pulled to head; own `clean-base` snapshot taken).
+  Session model: `Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext)`.
 - To spawn another: `incus publish mark-contrib-b/clean-base --alias contrib-base` →
   `incus launch contrib-base mark-contrib-c` → sanity per §6, then renew its `clean-base`.
+
+## Feedback scope (owner rule, §7dd)
+Proceed review comments ONLY on PRs whose head commit trailer says
+`LLM-assisted-by: Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext) via OpenCode` (October variant
+`Qwen3.8-Flash-Next Q8_0 (125B, local)` counts as ours too). Foreign trailers (GLM-5.3-Flash,
+DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 
 ## Board (captured 2026-11-14; re-verify via API at session start)
 | state | package | child | PR |
 |---|---|---|---|
-| DONE — PR open, awaiting review | app-arch/gzip | #884 | kit-fixups#579 |
-| DONE — PR open, awaiting review | app-arch/bzip2 | #881 | kit-fixups#582 |
-| DONE — PR open, awaiting review (other session) | app-arch/lz4 | #886 | kit-fixups#580 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/diffutils | #904 | — |
-| free | app-arch/cpio, dpkg, libarchive, pax, pxz, rar, snappy, unzip, xz-utils, zstd | #882–#883, #885, #887–#893 | — |
-| free | app-shells/bash, dash, tcsh, zsh | #894–#897 | — |
-| free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
-| free | net-dns/libidn2 | #902 | — |
-| free | sys-apps/baselayout … sysvinit (9, minus diffutils #904) | #903, #905–#912 | — |
-| free | sys-devel/autoconf … patch (8) | #913–#920 | — |
-| free | sys-libs/binutils-libs … zlib-ng (7) | #921–#927 | — |
+| MERGED (2026-11-14) | app-arch/gzip | #884 | kit-fixups#579 |
+| MERGED (2026-11-14) | sys-apps/diffutils | #904 | kit-fixups#584 |
+| MERGED (2026-11-14, GLM session) | app-arch/lz4 | #886 | kit-fixups#580 |
+| MERGED (2026-11-14, GLM session) | app-arch/cpio | #882 | kit-fixups#583 |
+| REVIEW ANSWERED (round 2: multilib→autotools, rebased, `941488b`) — maintainer's turn | app-arch/bzip2 | #881 | kit-fixups#582 |
+| OPEN, GLM session's own feedback (econf thread — NOT ours) | sys-libs/zlib | #926 | kit-fixups#581 |
+| OPEN awaiting review (tip 4.11.0 will be added by first bot run) | sys-apps/findutils | #906 | kit-fixups#586 |
+| OPEN awaiting review (tip 5.4.1; 5.1.0 track pinned via dual atoms) | sys-apps/gawk | #907 | kit-fixups#590 |
+| OPEN awaiting review (tip==tree==3.12, dual tracks) | sys-apps/grep | #908 | kit-fixups#593 |
+| OPEN awaiting review (tip 4.10; 4.9 pinned on all 3 branches) | sys-apps/sed | #911 | kit-fixups#594 |
+| OPEN awaiting review (tip 1.25.0; C++98 floor-checked; 1.23.0 pinned on branches) | sys-apps/groff | #909 | kit-fixups#596 |
+| OPEN awaiting review (tip 1.4.21; patches verified absorbed upstream; reverse-dep proven) | sys-devel/m4 | #918 | kit-fixups#599 |
+| OPEN awaiting review (dual-track: 2.7.6-r4 generated w/ 12 patches + tip 2.8.1) | sys-devel/patch | #920 | kit-fixups#601 |
+| OPEN awaiting review (astron.com dirlisting; tip 5.48 disclosed) | sys-apps/file | #905 | kit-fixups#603 |
+| OPEN awaiting review (download-page dirlisting + assets url pin; tip 710) | sys-apps/less | #910 | kit-fixups#605 |
+| OPEN awaiting review (2.x selector cap w/ dry-run rationale) | sys-apps/sysvinit | #912 | kit-fixups#608 |
+| OPEN awaiting review (capped 4.2.x tracking spec, rev 4, downstream-proof) | sys-devel/make | #919 | kit-fixups#611 |
+| OPEN awaiting review (dual 4.0.x tracks; floats tip 4.2.2, `MZ_PPMD=OFF` w/ sandbox probe proof) | sys-libs/minizip-ng | #922 | kit-fixups#616 |
+| OPEN awaiting review (IANA dirlisting; floats 2025b→2026f, zero zoneinfo delta) | sys-libs/timezone-data | #925 | kit-fixups#617 |
+| STALE round — GLM won the race (#612); our verified salvage kept at worktree `/kit-fixups/gmp-autogen-898` + `/root/gmp898/` until #612 merges |
+
+## Three-loop map (verified against issues/PRs 2026-11-15 ~12:40Z)
+- **This loop** (Qwen3.8-Flash, `mark-contrib-b`, `*-qwen` branches, doc = COREKIT-KICKOFF.md / PR #25): 2 merged (gzip #579, diffutils #584 — shipped by our cancelled-but-pushed subagent) + 14 in review: #582 #586 #590 #593 #594 #596 #599 #601 #603 #605 #608 #611 #616 #617.
+- **GLM loop** (GLM-5.3-Flash, `mark-contrib`): lz4 #580 + cpio #583 MERGED; in review: zlib #581, pax #585, rar #589, snappy #597, dpkg #587, libarchive #591, zstd #595, unzip #592, xz-utils #602, libpcre2 #607, libidn2 #609, dash #606, tcsh #600, zsh #604, gmp #612, libsigc++ #615, pxz #588.
+- **Third loop** (model TBD, `mark-loop-917` containers; doc = repo-root `CORE-KIT-LOOP.md` — NOT ours, do not touch/commit): bash #598, baselayout #610 (builtin-noop per geaaru's #903 comment), automake #613, gnuconfig #614; libtool #917 running; ncurses #923 held.
+- **Still unclaimed — EVIDENCE ROUNDS ALL POSTED (2026-11-15)**: readline #924 (shapes a/b/c + side-series inexpressibility probe), binutils #915 + binutils-libs #921 (version-computed SLOT, zero branch drift, dead-static 2.40 line, lockstep pins), libpcre #899 (homepage-dead upstream + 28-pkg consumer table), autoconf #913 (SLOT survey — geaaru's ask). Container loop IDLE pending maintainer picks; conversion specs ready to dispatch for any answer.
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
 Before claiming: re-sweep the child's comments (someone else may have claimed it) + `gh pr list
@@ -76,7 +101,16 @@ orchestrator re-verifies public state (§6) and updates THIS file + the epic com
   generated-ebuild symlink bug pre-push (`libbz2.so{,.1,1.0}` flattened wrong → `libbz2.so1.0`;
   `bash -n` passed it, only `ls /lib64/libbz2*` caught it — reinforces §7bb/cc: verify the
   installed file set, not syntax). lz4 (#886) is the parallel session's — PR #580. diffutils
-  (#904) dispatched next on mark-contrib-b.
-- Feed every new lesson into PLAYBOOK.md (open PR macaroni-os/ai-agent-playbook#24 covers §3.50,
-  §6 clone recipe, §7bb, §7cc; branch `corekit-880-loop-feedback` — keep pushing board updates
-  there until it merges).
+  (#904) — merged as kit-fixups#584 (the cancelled subagent had already pushed+opened it; see the
+  dual-session note below).
+- Feed every new lesson into PLAYBOOK.md. Branch `playbook/corekit-880-round2`: renumbers the
+  epic-workflow entry §3.50→§3.52 (post-merge collision with #22's Rust §3.50/§3.51 — §4's table
+  cites the Rust one), adds §7dd, refreshes this board. Keep pushing board updates to whatever
+  playbook branch is current.
+- DUAL-SESSION HAZARD (learned the loud way): both sessions share the GitHub account, so a
+  package can be converted by the OTHER session and merged while our subagent runs — a merged PR
+  under our own name may be OUR JUST-COMPLETED WORK (diffutils: claim 23:03, #584 opened 23:34 by
+  our own cancelled-but-already-pushed subagent, merged 23:35; the cancel killed only the report).
+  Before (re)dispatching a package: re-check child-issue state + `gh pr list --search <pkg>
+  --state all` IMMEDIATELY before dispatch, and when a subagent dies/is cancelled, inspect fork
+  branch sha vs container worktree sha vs PR head sha before concluding anything.
