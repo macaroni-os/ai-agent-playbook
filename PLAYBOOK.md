@@ -177,8 +177,12 @@ Known rough edges:
 8. Render-time template macros (`{{ .Values.pv }}`, `{{ .Values.p }}`, `regexReplaceAll …`) —
    NOT shell variables like `${PV}` — so generated ebuilds contain literals and read clean.
 9. House platform stance: **no multilib** (plain `autotools`/`cmake` eclasses, `cmake` supports
-   EAPI 7), **no FreeBSD** in `mark-*` branches, prefer simplicity when asked (dropping doc/test
-   USE + `src_test` is welcome; docs are read online; tests belong in workflows).
+   EAPI 7), **no FreeBSD** in `mark-*` branches, prefer simplicity when asked. **ALWAYS drop
+   `test` USE + `src_test` (and `restrict` added for it) in EVERY new autogen** — standing rule,
+   not a courtesy (geaaru, kit-fixups#586/#599/#601/#617, 2026-11-15: "Always drop `test` USE
+   for every new autogen. Add a note in the playbook"); docs read online, tests in workflows.
+   Ported bodies drop `userland_BSD`/`elibc_FreeBSD`/`elibc_Darwin` branches verbatim (same
+   review round, #601/#617).
    **Always prefer an ebuild WITHOUT multilib support** — when a tree ebuild still carries
    `multilib-minimal`/per-ABI machinery, collapsing it to a plain build is part of the
    conversion, not an optional extra (maintainer ask on macaroni-os/kit-fixups#587 review,
@@ -216,10 +220,11 @@ Known rough edges:
     version and check the selection steps to the next candidate.
 17. Prefer a simple `string` transform over regex when the release titles allow it (match the real
     title format — read a few titles first: "libnl 3.12.0" needs only `match: 'libnl '`).
-18. Provenance comments in generated ebuilds say **Mark**, never Gentoo/Funtoo ("Drop old Gentoo
-    reference and replace them with Mark"). User-visible DISTRO STAMPS however say **MacaroniOS**
-    (`--with-modified-by=Mark-…` → `--with-modified-by=MacaroniOS-…`, geaaru ask on
-    macaroni-os/kit-fixups#567, 2026-11-12). USE flags gating packages not in the tree get
+18. Provenance strings in generated ebuilds: NEVER Gentoo/Funtoo, and the packager/distro
+    string is **`MacaroniOS`** — geaaru 2026-11-15 (kit-fixups#586/#599): "I prefer to use common
+    `MacaroniOS` string instead of `Mark`" — superseding earlier rounds' `Packaged by Mark`
+    (and the #567-era split where only DISTRO STAMPS used MacaroniOS: now everything does,
+    e.g. `--with-modified-by=MacaroniOS-...`). USE flags gating packages not in the tree get
     simplified to the house equivalent (no `libressl` in tree → plain `ssl? ( dev-libs/openssl:= )`).
 19. Org commits carry an attribution trailer block (requested on macaroni-os/ai-agent-playbook#1):
     `LLM-assisted-by: <model id (size, location)> via <agent harness>` plus
