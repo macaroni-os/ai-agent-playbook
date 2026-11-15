@@ -39,7 +39,8 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (tip 4.11.0 will be added by first bot run) | sys-apps/findutils | #906 | kit-fixups#586 |
 | OPEN awaiting review (tip 5.4.1; 5.1.0 track pinned via dual atoms) | sys-apps/gawk | #907 | kit-fixups#590 |
 | OPEN awaiting review (tip==tree==3.12, dual tracks) | sys-apps/grep | #908 | kit-fixups#593 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/sed | #911 | — |
+| OPEN awaiting review (tip 4.10; 4.9 pinned on all 3 branches) | sys-apps/sed | #911 | kit-fixups#594 |
+| IN PROGRESS — mark-contrib-b (this session) | sys-apps/groff | #909 | — |
 | OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
 | OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
 | free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
