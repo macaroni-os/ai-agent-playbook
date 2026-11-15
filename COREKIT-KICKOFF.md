@@ -36,12 +36,13 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | MERGED (2026-11-14, GLM session) | app-arch/cpio | #882 | kit-fixups#583 |
 | REVIEW ANSWERED (round 2: multilib→autotools, rebased, `941488b`) — maintainer's turn | app-arch/bzip2 | #881 | kit-fixups#582 |
 | OPEN, GLM session's own feedback (econf thread — NOT ours) | sys-libs/zlib | #926 | kit-fixups#581 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/findutils | #906 | — |
+| OPEN awaiting review (tip 4.11.0 will be added by first bot run) | sys-apps/findutils | #906 | kit-fixups#586 |
+| IN PROGRESS — mark-contrib-b (this session) | sys-apps/gawk | #907 | — |
 | free | app-arch/dpkg, libarchive, pax, pxz, rar, snappy, unzip, xz-utils, zstd | #883, #885, #887–#893 | — |
 | free | app-shells/bash, dash, tcsh, zsh | #894–#897 | — |
 | free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
 | free | net-dns/libidn2 | #902 | — |
-| free | sys-apps/baselayout … sysvinit (9, minus diffutils #904) | #903, #905–#912 | — |
+| free | sys-apps/baselayout … sysvinit (8, minus diffutils #904, gawk #907) | #903, #905, #908–#912 | — |
 | free | sys-devel/autoconf … patch (8) | #913–#920 | — |
 | free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
 
