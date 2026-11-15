@@ -13,6 +13,8 @@ the epic. Conversions need NO release-branch PRs (§3.38 + confirmed after #573:
 release branches carry merge-atom recipes pointing at `core-kit@mark-unstable`).
 
 ## Sandboxes (one-container rule, §6)
+- Review-fix worktrees deliberately KEPT in `/kit-fixups/` at pushed heads: `less-autogen-910`,
+  `patch-autogen-920`, `sysvinit-autogen-912` — prune after each PR merges.
 - `mark-contrib` — shared/contested: in use by the GLM-5.3-Flash session (children #882 cpio +
   #886 lz4 both MERGED; #926 zlib open with its own review thread — theirs to answer).
 - `mark-contrib-b` — this loop's dedicated clone (from the `contrib-base` image =
@@ -45,7 +47,8 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (dual-track: 2.7.6-r4 generated w/ 12 patches + tip 2.8.1) | sys-devel/patch | #920 | kit-fixups#601 |
 | OPEN awaiting review (astron.com dirlisting; tip 5.48 disclosed) | sys-apps/file | #905 | kit-fixups#603 |
 | OPEN awaiting review (download-page dirlisting + assets url pin; tip 710) | sys-apps/less | #910 | kit-fixups#605 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/sysvinit | #912 | — |
+| OPEN awaiting review (2.x selector cap w/ dry-run rationale) | sys-apps/sysvinit | #912 | kit-fixups#608 |
+| IN PROGRESS — mark-contrib-b (this session, toolchain-sensitive) | sys-devel/make | #919 | — |
 | OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
 | OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
 | free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
@@ -53,7 +56,7 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
 | free | net-dns/libidn2 | #902 | — |
 | free | sys-apps/baselayout | #903 | — |
-| free | sys-devel/autoconf … autoconf/automake/binutils/gnuconfig/libtool/make (6) | #913–#917, #919 | — |
+| free | sys-devel/autoconf/automake/binutils/gnuconfig/libtool (5) | #913–#917 | — |
 | free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
