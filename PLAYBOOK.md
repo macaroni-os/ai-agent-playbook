@@ -710,7 +710,12 @@ Known rough edges:
 ## 7. Known agent failure modes (all actually observed — check before assuming gremlins)
 
 a. `gh api -f body=@file` does **not** expand `@file` → the literal path gets posted publicly.
-   Use `-f body="$(cat file)"` or `gh pr comment --body-file`. (Caught by human PR review; fix =
+   Use `-f body="$(cat file)"` or `gh pr comment --body-file`. Mirror failure (observed 2026-11-15
+   on mark-issues#908): a body with backticks inside **double quotes** command-substitutes → the
+   mangled text posts and reads as gibberish ("`cmp`-identical" → "-identical"). Safe pattern for
+   any body containing backticks/`$`: write it to a file and post via `--input` JSON
+   (`jq -n --rawfile b file '{body:$b}'`) or single-quoted heredoc; PATCH-edit such comments
+   immediately and re-fetch to confirm. (Caught by human PR review; fix =
    delete comment + repost real content as threaded replies.)
 b. Shell-quoting slips echoing `$(gh auth token)` into transcripts → rotate (`gh auth refresh`).
 c. EOF-append rebase conflicts in `<kit>/autogen.kit.d/base.yml` (several PRs append the same
