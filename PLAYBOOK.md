@@ -596,6 +596,30 @@ Known rough edges:
       with the cargo eclass' own `_cargo_process_crate` in `src_unpack`. Upstream improvement ask:
       key the local-crate detection by name+version.
 
+ 52. **Core-kit autogen review round: render the names, declare docs, drop Gentoo cross-compile**
+      (geaaru review on macaroni-os/kit-fixups#585/#589/#600/#620, 2026-11-15):
+      - **No inherited cross-compilation logic.** The toolchain comes from the Macaroni From
+        Scratch project, so ported ebuilds must NOT carry the old Gentoo cross answers
+        (`if tc-is-cross-compiler ; then … export bash_cv_func_sigsetjmp/… ; fi`) and the
+        `! tc-is-cross-compiler` guards around a package's own sub-builds are dropped with them —
+        the maintainer was explicit: "We don't want support the old Gentoo cross compilation logic."
+      - **Names in spec paths come from the renderer**, not shell vars: write
+        `s: '${WORKDIR}/{{ .Values.pn }}'` instead of `s: '${WORKDIR}/${PN}'` — the generated
+        ebuild gets the literal and readers do not have to resolve `${PN}` mentally
+        ("it's always better to use the mark-devkit render and generate more clear file for users").
+      - **Documentation lists use the dedicated keys**: the `docs:` spec key renders `DOCS=( … )`
+        instead of hand-writing the array inside `src_install`; env-style lists such as
+        `HTML_DOCS="doc/*.html"` belong in `extra_envs:` (both render before the phases).
+      - **Proprietary/prebuilt drops** do not need `mirror` in RESTRICT — `restrict: bindist`
+        is enough when the distfile is already pinned in the spec ("you can drop `mirror` from
+        `restrict`").
+      - **Shared files mean a rebase queue**: every open PR that edits
+        `core-kit/autogen.kit.d/core.yml`, `merge.kit.d/core.yml` or `core_autogen.yml` goes dirty
+        the moment ANY sibling PR merges (the maintainer merges fast and the remaining branches
+        conflict on the same anchors). Rebase + re-verify immediately after each merge — "You need
+        to rebase it again and monitoring all PR using the same files" — and treat merge order as
+        part of the PR's completion, not an afterthought.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
