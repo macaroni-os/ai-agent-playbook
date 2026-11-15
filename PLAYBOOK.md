@@ -687,7 +687,10 @@ Known rough edges:
   living-handoff file, producing contradicting commits on one PR branch that needed a corrective
   push. Sequential subagents *within* a session are not enough: a second concurrent session gets
   its own container, and the session that does NOT own the loop's repo leaves its living docs
-  (e.g. MFS-KICKOFF.md) to the owner.
+  (e.g. MFS-KICKOFF.md) to the owner. Same for working TREES: if a foreign living-doc file
+  appears untracked in your repo CWD (three core-kit loops shared one checkout 2026-11-15),
+  never commit, edit, or "reconcile" it — it encodes the OTHER loop's perception; re-sync your
+  own state from issues/PRs ground truth.
   Symptom on the kit-fixups loop (core-kit #880, 2026-11-14): the shared `/kit-fixups` checkout
   switches to a foreign branch mid-task and the working tree grows mixed hunks. Countermeasure
   while contaminated: capture evidence, remove ONLY your hunks from the shared copy, build/commit

@@ -49,11 +49,15 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (download-page dirlisting + assets url pin; tip 710) | sys-apps/less | #910 | kit-fixups#605 |
 | OPEN awaiting review (2.x selector cap w/ dry-run rationale) | sys-apps/sysvinit | #912 | kit-fixups#608 |
 | OPEN awaiting review (capped 4.2.x tracking spec, rev 4, downstream-proof) | sys-devel/make | #919 | kit-fixups#611 |
+| OPEN awaiting review (dual 4.0.x tracks; floats tip 4.2.2, `MZ_PPMD=OFF` w/ sandbox probe proof) | sys-libs/minizip-ng | #922 | kit-fixups#616 |
+| OPEN awaiting review (IANA dirlisting; floats 2025b→2026f, zero zoneinfo delta) | sys-libs/timezone-data | #925 | kit-fixups#617 |
 | STALE round — GLM won the race (#612); our verified salvage kept at worktree `/kit-fixups/gmp-autogen-898` + `/root/gmp898/` until #612 merges |
-| IN PROGRESS — mark-contrib-b (this session) | sys-libs/minizip-ng | #922 | — |
-| OPEN, GLM session (not ours) — snappy #597, dpkg #587, libarchive #591, xz-utils #602, zstd #595, unzip #592, libpcre2 #607, libidn2 #609, dash #606, tcsh #600, zsh #604, pax #585, rar #589, zlib #581 | their children | — | see PRs |
-| free (title-filtered dup check 2026-11-15) | dev-libs/libsigc++ #901 (2 slots), sys-libs/timezone-data #925, app-arch/pxz #888 | — | — |
-| maintainer-blocked / needs decision | baselayout #903 (noop-vs-legacy), libpcre #899 (EOL), bash #894 + readline #924 (patch-series policy), autoconf #913/automake #914/libtool #917 (SLOT question on epic), binutils #915/binutils-libs #921 (slot policy), gnuconfig #916 (snapshot shape), make-tip upgrade (asked on #919) | — | — |
+
+## Three-loop map (verified against issues/PRs 2026-11-15 ~12:40Z)
+- **This loop** (Qwen3.8-Flash, `mark-contrib-b`, `*-qwen` branches, doc = COREKIT-KICKOFF.md / PR #25): 2 merged (gzip #579, diffutils #584 — shipped by our cancelled-but-pushed subagent) + 14 in review: #582 #586 #590 #593 #594 #596 #599 #601 #603 #605 #608 #611 #616 #617.
+- **GLM loop** (GLM-5.3-Flash, `mark-contrib`): lz4 #580 + cpio #583 MERGED; in review: zlib #581, pax #585, rar #589, snappy #597, dpkg #587, libarchive #591, zstd #595, unzip #592, xz-utils #602, libpcre2 #607, libidn2 #609, dash #606, tcsh #600, zsh #604, gmp #612, libsigc++ #615, pxz #588.
+- **Third loop** (model TBD, `mark-loop-917` containers; doc = repo-root `CORE-KIT-LOOP.md` — NOT ours, do not touch/commit): bash #598, baselayout #610 (builtin-noop per geaaru's #903 comment), automake #613, gnuconfig #614; libtool #917 running; ncurses #923 held.
+- **Still unclaimed** → evidence rounds until maintainers rule: libpcre #899 (EOL: noop vs retire), autoconf #913 (SLOT survey RUNNING now — geaaru's ask), binutils #915 + binutils-libs #921 (slot policy), readline #924 (patch-series policy), make-tip upgrade (asked on #919).
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
 Before claiming: re-sweep the child's comments (someone else may have claimed it) + `gh pr list
