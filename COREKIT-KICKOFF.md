@@ -42,14 +42,15 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (tip 4.10; 4.9 pinned on all 3 branches) | sys-apps/sed | #911 | kit-fixups#594 |
 | OPEN awaiting review (tip 1.25.0; C++98 floor-checked; 1.23.0 pinned on branches) | sys-apps/groff | #909 | kit-fixups#596 |
 | OPEN awaiting review (tip 1.4.21; patches verified absorbed upstream; reverse-dep proven) | sys-devel/m4 | #918 | kit-fixups#599 |
-| IN PROGRESS — mark-contrib-b (this session, dual-track+revision hard case) | sys-devel/patch | #920 | — |
+| OPEN awaiting review (dual-track: 2.7.6-r4 generated w/ 12 patches + tip 2.8.1) | sys-devel/patch | #920 | kit-fixups#601 |
+| IN PROGRESS — mark-contrib-b (this session) | sys-apps/file | #905 | — |
 | OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
 | OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
 | free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
 | free | app-shells/bash, dash, tcsh, zsh | #894–#897 | — |
 | free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
 | free | net-dns/libidn2 | #902 | — |
-| free | sys-apps/baselayout, file, groff, less, sysvinit | #903, #905, #909, #910, #912 | — |
+| free | sys-apps/baselayout, less, sysvinit | #903, #910, #912 | — |
 | free | sys-devel/autoconf … autoconf/automake/binutils/gnuconfig/libtool/make (6) | #913–#917, #919 | — |
 | free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
 

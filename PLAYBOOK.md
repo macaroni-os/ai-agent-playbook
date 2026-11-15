@@ -84,6 +84,13 @@ Known rough edges:
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
 - **Never `shred -u` a script that bash is still executing** — the running wrapper's inode vanishes
   and the detached chain dies mid-phase without an error line. Detach a small launcher instead.
+- **`autogen-thin` with `GITHUB_TOKEN` unset fails SILENTLY** (patch #601, 2026-11-15): logs
+  `Missing git token! Push interrupted!` but **exits 0 and produces no output dir** — a generation
+  "success" with zero artifacts. Always assert the generated ebuild file exists (and is non-empty)
+  after every autogen-thin run, independent of rc, and treat an empty `--to` dir as a token-plumbing
+  failure (§2 `--env` position trap), not a generator bug. Same round's §7e-on-tooling near-miss: an
+  extraction that yields a **0-byte file** made a "clean" render-audit verdict vacuous — assert the
+  artifact backs the check BEFORE trusting a green (re-derive from raw, cf. §7v).
 - Detached-build polling: `pgrep -f "emerge --quiet-build"` ALSO matches the `bash -c` wrapper
   of the very exec call that runs the pgrep (the pattern is in its own command line) → phantom
   "STILL-RUNNING". Trust sentinels instead: log tail sentinels (`>>> Installing`, `Calculating
@@ -627,6 +634,7 @@ Known rough edges:
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
 | systemd unit models the API socket as `Environment=SOCKET=…` | upstream shape is a `.socket` unit + socket activation, with `EnvironmentFile=-/etc/conf.d/<pn>` only for `LOG_LEVEL`-style knobs (§3.46) |
+| one PN needs a **legacy CVE-served track + floating tip** simultaneously | multiple `packages:` entries for the SAME PN with per-entry `selector:` + `revision:` + `patches:` (gcc-cluster precedent; sys-devel/patch macaroni-os/kit-fixups#601 generated `2.7.6-r4` with 12 live patches AND the 2.8.1 tip from one `--pkg patch` run; `.Values.p` excludes `-rN`, so bumping a revisioned track keeps the distfile pair stable, §3.26) |
 | `error: rustc X is not supported by the following packages: … requires rustc Y` | declaration gate ≠ compile fail: `cargo_src_configure --ignore-rust-version` (no eclass var — §3.50), per-branch ceiling probe, disclose; never bump the toolchain yourself (§9) |
 | silent `rustc` SIGABRT (exit 134, no diagnostics) on random tiny deps ONLY inside the portage sandbox | nested-container sandbox-IPC flake: control build the same tree unsandboxed + merge `FEATURES="-sandbox"`, disclose the full build-attempt tally in the PR body — do not touch the spec or add `restrict:` |
 
