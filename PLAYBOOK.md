@@ -179,6 +179,11 @@ Known rough edges:
 9. House platform stance: **no multilib** (plain `autotools`/`cmake` eclasses, `cmake` supports
    EAPI 7), **no FreeBSD** in `mark-*` branches, prefer simplicity when asked (dropping doc/test
    USE + `src_test` is welcome; docs are read online; tests belong in workflows).
+   **Always prefer an ebuild WITHOUT multilib support** — when a tree ebuild still carries
+   `multilib-minimal`/per-ABI machinery, collapsing it to a plain build is part of the
+   conversion, not an optional extra (maintainer ask on macaroni-os/kit-fixups#587 review,
+   2026-11-15; ncurses #923 hit the corollary too: the eclass pre-creates per-ABI `BUILD_DIR`
+   which a plain build then lacks — re-create what the eclass was providing or the phases break).
 10. Zip assets: add `app-arch/unzip` to `bdepend` explicitly. Don't spell out defaults
     (`query: releases` can be omitted).
 11. Rust/cargo packages: use the `rust` extension (`extensions_defs: rust` + package-level
