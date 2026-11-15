@@ -925,6 +925,13 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     on PRs whose head commit carries YOUR `LLM-assisted-by: <your model id>` — foreign-trailer
     PRs (#581 zlib was GLM-5.3-Flash) belong to their session even under the same author; a
     "takeover" of one was cancelled mid-flight before it touched anything.
+    Two corollaries proven by the gmp #898 race (2026-11-15, ended STALE, zero public writes):
+    (a) **branch names must carry the model tag** (`gmp-autogen-898-qwen`) — the default
+    `<pkg>-autogen-<issue>` convention collides on the shared fork, and a push `rc=1
+    non-fast-forward` IS the race signal: `ls-remote` + read the foreign head commit's trailer
+    before anything else, STOP if it's not yours (force-pushing over a foreign-trailer branch is
+    forbidden); (b) keep the full verification package anyway (`/root/<pkg>*/`) — a STALE round's
+    evidence is directly reusable if the winning PR fails review.
 
 ## 8. Feedback sweep (do it between every task)
 

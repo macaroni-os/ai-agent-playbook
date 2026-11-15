@@ -49,9 +49,10 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (download-page dirlisting + assets url pin; tip 710) | sys-apps/less | #910 | kit-fixups#605 |
 | OPEN awaiting review (2.x selector cap w/ dry-run rationale) | sys-apps/sysvinit | #912 | kit-fixups#608 |
 | OPEN awaiting review (capped 4.2.x tracking spec, rev 4, downstream-proof) | sys-devel/make | #919 | kit-fixups#611 |
-| IN PROGRESS — mark-contrib-b (this session) | dev-libs/gmp | #898 | — |
+| STALE round — GLM won the race (#612); our verified salvage kept at worktree `/kit-fixups/gmp-autogen-898` + `/root/gmp898/` until #612 merges |
+| IN PROGRESS — mark-contrib-b (this session) | sys-libs/minizip-ng | #922 | — |
 | OPEN, GLM session (not ours) — snappy #597, dpkg #587, libarchive #591, xz-utils #602, zstd #595, unzip #592, libpcre2 #607, libidn2 #609, dash #606, tcsh #600, zsh #604, pax #585, rar #589, zlib #581 | their children | — | see PRs |
-| free (title-filtered dup check 2026-11-15) | dev-libs/libsigc++ #901 (2 slots), sys-libs/minizip-ng #922, sys-libs/timezone-data #925, app-arch/pxz #888 | — | — |
+| free (title-filtered dup check 2026-11-15) | dev-libs/libsigc++ #901 (2 slots), sys-libs/timezone-data #925, app-arch/pxz #888 | — | — |
 | maintainer-blocked / needs decision | baselayout #903 (noop-vs-legacy), libpcre #899 (EOL), bash #894 + readline #924 (patch-series policy), autoconf #913/automake #914/libtool #917 (SLOT question on epic), binutils #915/binutils-libs #921 (slot policy), gnuconfig #916 (snapshot shape), make-tip upgrade (asked on #919) | — | — |
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
