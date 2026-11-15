@@ -257,6 +257,10 @@ Known rough edges:
     Beware (freetds probe 2026-10-30): `github.match:` is evaluated against the RAW release
     title, NOT the title-transformed candidate — combining the two yields "No versions found".
     Prerelease/tag-page garbage is already filtered natively; don't add `match:` to rescue it.
+    SCOPE: `match:` is GITHUB-section only — `AutogenDirlistingProps` has NO Match field in
+    mark-devkit 0.36.1 (struct-proven, sys-devel/make macaroni-os/kit-fixups#611): a `match:`
+    inside a dirlisting block is SILENTLY INERT; use `dir.exclude` there. Discriminating probe
+    (uncapped vs capped selection) validates whichever key you write.
 25. Without an explicit `github.assets:` override the generator falls back to the
     `api.github.com` auto-generated source tarball, whose name differs from the uploaded asset
     (freetds: uploaded `freetds-<ver>.tar.bz2`). Set `assets:` when the uploaded asset name/

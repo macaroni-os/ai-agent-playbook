@@ -48,16 +48,11 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (astron.com dirlisting; tip 5.48 disclosed) | sys-apps/file | #905 | kit-fixups#603 |
 | OPEN awaiting review (download-page dirlisting + assets url pin; tip 710) | sys-apps/less | #910 | kit-fixups#605 |
 | OPEN awaiting review (2.x selector cap w/ dry-run rationale) | sys-apps/sysvinit | #912 | kit-fixups#608 |
-| IN PROGRESS — mark-contrib-b (this session, toolchain-sensitive) | sys-devel/make | #919 | — |
-| OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
-| OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
-| free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
-| free | app-shells/bash, dash, tcsh, zsh | #894–#897 | — |
-| free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
-| free | net-dns/libidn2 | #902 | — |
-| free | sys-apps/baselayout | #903 | — |
-| free | sys-devel/autoconf/automake/binutils/gnuconfig/libtool (5) | #913–#917 | — |
-| free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
+| OPEN awaiting review (capped 4.2.x tracking spec, rev 4, downstream-proof) | sys-devel/make | #919 | kit-fixups#611 |
+| IN PROGRESS — mark-contrib-b (this session) | dev-libs/gmp | #898 | — |
+| OPEN, GLM session (not ours) — snappy #597, dpkg #587, libarchive #591, xz-utils #602, zstd #595, unzip #592, libpcre2 #607, libidn2 #609, dash #606, tcsh #600, zsh #604, pax #585, rar #589, zlib #581 | their children | — | see PRs |
+| free (title-filtered dup check 2026-11-15) | dev-libs/libsigc++ #901 (2 slots), sys-libs/minizip-ng #922, sys-libs/timezone-data #925, app-arch/pxz #888 | — | — |
+| maintainer-blocked / needs decision | baselayout #903 (noop-vs-legacy), libpcre #899 (EOL), bash #894 + readline #924 (patch-series policy), autoconf #913/automake #914/libtool #917 (SLOT question on epic), binutils #915/binutils-libs #921 (slot policy), gnuconfig #916 (snapshot shape), make-tip upgrade (asked on #919) | — | — |
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
 Before claiming: re-sweep the child's comments (someone else may have claimed it) + `gh pr list
