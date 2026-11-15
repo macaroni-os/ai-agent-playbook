@@ -1176,3 +1176,16 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
    Discord; org attribution trailers + `Signed-off-by` apply (no `ai_ass` label there —
    only kit-fixups defines it). Sync the PR body with every head push (version `+N`, evidence
    blocks) — stale body claims land on the reviewer's desk (a "+13" body against a "+11" head).
+ab. **`git commit --amend` commits the INDEX, not your working-tree edits** (two hits on
+   2026-11-15, kit-fixups#587 + #602 rounds): a fix made with `sed -i`/editors but never
+   `git add`-ed leaves the amend a no-op while the public reply claims the change — one of
+   the two reached the remote before being caught. Gate: after amending, `git diff <old-head> HEAD`
+   must show EXACTLY the intended delta (an empty diff = the amend was a no-op), then verify the
+   pushed content from the API (contents/blob or `pulls/<n>` files), never from local intent.
+ac. **`mark-devkit autogen` exits 0 even when a package's selection fails** ("All done" prints
+   regardless — observed on kit-fixups#602 after a rebase misplaced the xz-utils atom into the
+   `pxz` noop cluster, whose `defaults.vars.versions` leaked into it). A regen "rc=0" is NOT a
+   regen proof. Strict check: the log contains `For package <cat>/<pn> selected version <v>`
+   AND the generated ebuild file exists under the output tree; batch audits must grep the
+   de-ANSI-fied log (raw logs carry escape bytes that poison version greps). Watch for cluster
+   `defaults` leaking into atoms placed inside them during conflict resolution.
