@@ -40,7 +40,8 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | OPEN awaiting review (tip 5.4.1; 5.1.0 track pinned via dual atoms) | sys-apps/gawk | #907 | kit-fixups#590 |
 | OPEN awaiting review (tip==tree==3.12, dual tracks) | sys-apps/grep | #908 | kit-fixups#593 |
 | OPEN awaiting review (tip 4.10; 4.9 pinned on all 3 branches) | sys-apps/sed | #911 | kit-fixups#594 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/groff | #909 | — |
+| OPEN awaiting review (tip 1.25.0; C++98 floor-checked; 1.23.0 pinned on branches) | sys-apps/groff | #909 | kit-fixups#596 |
+| IN PROGRESS — mark-contrib-b (this session) | sys-devel/m4 | #918 | — |
 | OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
 | OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
 | free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
@@ -48,7 +49,7 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
 | free | net-dns/libidn2 | #902 | — |
 | free | sys-apps/baselayout, file, groff, less, sysvinit | #903, #905, #909, #910, #912 | — |
-| free | sys-devel/autoconf … patch (8) | #913–#920 | — |
+| free | sys-devel/autoconf … patch (7, minus m4 #918) | #913–#917, #919, #920 | — |
 | free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
 
 Full number↔package mapping: `gh api "repos/macaroni-os/mark-issues/issues/880/sub_issues?per_page=100" --jq '.[] | "\(.number) \(.title)"'`
