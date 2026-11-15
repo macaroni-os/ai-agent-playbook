@@ -37,12 +37,15 @@ DeepSeek V4.1) = other sessions' loops, even under the same GitHub author.
 | REVIEW ANSWERED (round 2: multilib→autotools, rebased, `941488b`) — maintainer's turn | app-arch/bzip2 | #881 | kit-fixups#582 |
 | OPEN, GLM session's own feedback (econf thread — NOT ours) | sys-libs/zlib | #926 | kit-fixups#581 |
 | OPEN awaiting review (tip 4.11.0 will be added by first bot run) | sys-apps/findutils | #906 | kit-fixups#586 |
-| IN PROGRESS — mark-contrib-b (this session) | sys-apps/gawk | #907 | — |
-| free | app-arch/dpkg, libarchive, pax, pxz, rar, snappy, unzip, xz-utils, zstd | #883, #885, #887–#893 | — |
+| OPEN awaiting review (tip 5.4.1; 5.1.0 track pinned via dual atoms) | sys-apps/gawk | #907 | kit-fixups#590 |
+| IN PROGRESS — mark-contrib-b (this session) | sys-apps/grep | #908 | — |
+| OPEN, GLM session (not ours) | app-arch/pax | #887 | kit-fixups#585 |
+| OPEN, GLM session (not ours) | app-arch/rar | #889 | kit-fixups#589 |
+| free | app-arch/dpkg, libarchive, pxz, snappy, unzip, xz-utils, zstd (pax #887 + rar #889 → GLM #585/#589) | #883, #885, #888, #890–#893 | — |
 | free | app-shells/bash, dash, tcsh, zsh | #894–#897 | — |
 | free | dev-libs/gmp, libpcre, libpcre2, libsigc++ | #898–#901 | — |
 | free | net-dns/libidn2 | #902 | — |
-| free | sys-apps/baselayout … sysvinit (8, minus diffutils #904, gawk #907) | #903, #905, #908–#912 | — |
+| free | sys-apps/baselayout, file, groff, less, sed, sysvinit | #903, #905, #909–#912 | — |
 | free | sys-devel/autoconf … patch (8) | #913–#920 | — |
 | free | sys-libs/zlib(-ng) … see #581 in review; binutils-libs, minizip-ng, ncurses, readline, timezone-data | #921, #923–#925, #927 | — |
 
