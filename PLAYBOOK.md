@@ -181,8 +181,9 @@ Known rough edges:
    `test` USE + `src_test` (and `restrict` added for it) in EVERY new autogen** — standing rule,
    not a courtesy (geaaru, kit-fixups#586/#599/#601/#617, 2026-11-15: "Always drop `test` USE
    for every new autogen. Add a note in the playbook"); docs read online, tests in workflows.
-   Ported bodies drop `userland_BSD`/`elibc_FreeBSD`/`elibc_Darwin` branches verbatim (same
-   review round, #601/#617).
+   Ported bodies drop `userland_BSD`/`elibc_FreeBSD`/`elibc_Darwin` **and `kernel_FreeBSD`/
+   `kernel_Darwin`** conditional branches verbatim (#601/#617; the `kernel_*` variant came from
+   geaaru on #608: "drop kernel_FreeBSD support, please").
    **Always prefer an ebuild WITHOUT multilib support** — when a tree ebuild still carries
    `multilib-minimal`/per-ABI machinery, collapsing it to a plain build is part of the
    conversion, not an optional extra (maintainer ask on macaroni-os/kit-fixups#587 review,
@@ -564,6 +565,12 @@ Known rough edges:
      literals rejoin exactly (verified: all service entries COMMENT-ONLY(-1), the removed sentence
      line, and files//Manifests identical — 28/28 cells). Same-round re-selection must be asserted
      (both runs captured the same 3 versions) so the table cannot be polluted by upstream releases.
+     "Create a specific key definition" (geaaru, sysvinit #608) = give the package its OWN
+     autogen cluster key instead of living in a shared catch-all cluster, with one `packages:`
+     entry per release line, each carrying its own `selector:` (+ per-line `patches:`/
+     `revision:`) — same machinery as the §4 single-PN dual-track row; prove generation AND a
+     real build for EVERY line, especially an init-adjacent new-major track the cap previously
+     held back.
      Maintainer stance confirmed the same session: entity-provenance comments in generated ebuilds
      are NOT wanted ("drop all lines with `entity_pr` and the comment", §3.18/§3.34 applied to
      macaroni-commons PR refs) — the `enewgroup`/`enewuser` lines carry the ids; nothing else.
@@ -728,7 +735,12 @@ Known rough edges:
   (e.g. MFS-KICKOFF.md) to the owner. Same for working TREES: if a foreign living-doc file
   appears untracked in your repo CWD (three core-kit loops shared one checkout 2026-11-15),
   never commit, edit, or "reconcile" it — it encodes the OTHER loop's perception; re-sync your
-  own state from issues/PRs ground truth.
+  own state from issues/PRs ground truth. Two live incidents on the playbook repo itself: (a) pushing AFTER the
+  branch's PR merged strands the commits (twice: #24, #25 — ALWAYS check `pulls/<n>.state`
+  immediately before a playbook push); (b) concurrent loops on ONE checkout interleave commits
+  into each other's branch history (a GLM-loop commit rode a Qwen-loop force-push). Run playbook
+  work in a dedicated `git worktree` per loop; stranded commits are re-landed onto a fresh
+  branch via `cherry-pick -x` (provenance preserved), not re-typed.
   Symptom on the kit-fixups loop (core-kit #880, 2026-11-14): the shared `/kit-fixups` checkout
   switches to a foreign branch mid-task and the working tree grows mixed hunks. Countermeasure
   while contaminated: capture evidence, remove ONLY your hunks from the shared copy, build/commit
@@ -979,7 +991,7 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
 ```
 gh api "repos/macaroni-os/kit-fixups/issues/<N>/comments?since=<ISO>"
 gh api "repos/macaroni-os/kit-fixups/pulls/<N>/comments?since=<ISO>"
-gh api "repos/macaroni-os/kit-fixups/pulls/<N>/reviews?since=<ISO>"   # empty-body COMMENTED = inline arrivals (§7l)
+gh api "repos/macaroni-os/kit-fixups/pulls/<N>/reviews?per_page=100"   # `since=` is IGNORED here — filter client-side on submitted_at (observed 2026-11-15); empty-body COMMENTED = inline arrivals (§7l)
 gh pr view <N> --repo macaroni-os/kit-fixups --json state,mergeable
 ```
 …for every open PR of yours (also the kit repos!). Track the last-check timestamp. Review replies
