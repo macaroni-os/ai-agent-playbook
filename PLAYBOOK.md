@@ -666,6 +666,38 @@ Known rough edges:
      parent). In-tree precedent: `sys-apps/util-linux-python` — copy its shape (same tarball,
      single python target, own files payload if any).
 
+ 54. **CPU-flag USE surfaces are declared as a `vars` list and rendered into `iuse` — never
+     expanded at bash level** (geaaru on macaroni-os/kit-fixups#618, 2026-11-18: "the logic is
+     managed at render level not at bash level expanding variables"). For packages exposing
+     `cpu_flags_*` USEs, keep the supported flags in one variable and let the template loop emit
+     them:
+
+     ```yaml
+     vars:
+       cpu_flags:
+         - x86_avx2
+         - x86_sse2
+         - x86_ssse3
+         - x86_sse4a
+         - x86_pclmul
+         - arm_crc32
+         - arm_neon
+         - ppc_vsx2
+       iuse: |
+         compat
+         {{- range $f := .Values.cpu_flags }}
+         cpu_flags_{{ $f }}
+         {{- end }}
+     ```
+
+     The generated ebuild carries `IUSE="compat` plus one `cpu_flags_*` per line — a valid quoted
+     whitespace list — and the `{{- range }}` trim markers keep the render clean. The rejected
+     alternative was an `extra_envs: - 'CPU_USE=( … )'` array expanded with
+     `${CPU_USE[@]/#/cpu_flags_}` in `iuse`: it works in bash, but hides the flag surface from the
+     spec and was explicitly corrected by the maintainer (media-kit precedent:
+     `media-kit/autogen.kit.d/base.yml`, the ffmpeg cluster). Same rule for `test` USE: core/tool
+     packages drop it and pass the build-system toggle explicitly (e.g. `-DBUILD_TESTING=OFF`).
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
