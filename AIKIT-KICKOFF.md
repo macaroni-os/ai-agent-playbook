@@ -18,9 +18,9 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 ## Board (captured 2026-11-19; re-verify via API at session start)
 | state | item | issue | PR |
 |---|---|---|---|
-| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`). **Round 3 ANSWERED (2026-11-19 ~21:00Z)**: distutils-r1 = negative-proofed (setup.py has no setup()/pyproject — installer helper; pydeps/python_compat render NOTHING under builtin-github — throwaway probe; §3.59) + dep determination (static AST closure + headless mock-serve on 3.11 with optionals ABSENT) → jinja-only necessary&sufficient, NO atoms added; amendment `1ab51041` (comment-only, byte-identical render both trees), reply posted (`issuecomment-7020500555`) incl. the PY_PACKAGES-parity offer + honest tree gaps (jsonschema 4.5.1 < upstream pin; tqdm/textual absent) | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
+| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`). **Round 3 ANSWERED (2026-11-19 ~21:00Z)**: distutils-r1 = negative-proofed (setup.py has no setup()/pyproject — installer helper; pydeps/python_compat render NOTHING under builtin-github — throwaway probe; §3.59) + dep determination (static AST closure + headless mock-serve on 3.11 with optionals ABSENT) → jinja-only necessary&sufficient, NO atoms added; amendment `1ab51041` (comment-only, byte-identical render both trees), reply posted (`issuecomment-7020500555`) incl. the PY_PACKAGES-parity offer + honest tree gaps (jsonschema 4.5.1 < upstream pin; tqdm/textual absent) → **Round 4 RUNNING 2026-11-20**: install-layout inline (build/-dir, /usr/bin entry, downloads dir) + the requested #950/#951 filed | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
-| OPEN awaiting review — REWORKED per geaaru on #949 ("tarballs instead of AppImage"): now `strata-control`-tarball-based (version-free matcher rides the component skew per tag; engines stay runtime-fetched — per-release asset fluctuation + collision evidence in body); 1 commit `bcfc755` (was `44bc023`), reply posted (`issuecomment-7020417748`) + pointer on the PR | app-ai/strata-bin | #949 (claimed; probe + rework evidence posted) | kit-fixups#631 |
+| OPEN awaiting review — REWORKED per geaaru on #949 ("tarballs instead of AppImage"): now `strata-control`-tarball-based (version-free matcher rides the component skew per tag; engines stay runtime-fetched — per-release asset fluctuation + collision evidence in body); 1 commit `bcfc755` (was `44bc023`), reply posted (`issuecomment-7020417748`) + pointer on the PR → **Round 2 RUNNING 2026-11-20**: geaaru calls engines back IN (USE-gated assets per backend + arm64 custom USEs, arch ties via required_use; drop the KEYWORDS line) — fluctuation (v0.2.15 has no x86_64 engine assets) is the central probe | app-ai/strata-bin | #949 (claimed; probe + rework evidence posted) | kit-fixups#631 |
 
 ## Sandboxes (one-container rule, §6)
 - `mark-contrib-932-exp` — experimental-verification host (image `macaroni/mark-experimental` @ 20260909).
@@ -67,13 +67,17 @@ Answer review comments only on PRs whose head-commit trailer says
 1. **FEEDBACK: #628 geaaru rounds 1–3 — ALL ANSWERED 2026-11-19** (experimental rebuild + jinja
    amendment `b6c520e`; hook warning + venue recovery recipe; distutils-r1/RDEPEND determination →
    `1ab51041`, replies posted). Maintainer's turn; open offer on the table = PY_PACKAGES parity set.
-2. Watch #628 / #630 / #631 for maintainer threads — same-day, fresh captured proof. Open decisions
-   now: #628 PY_PACKAGES-parity offer (geaaru's call; honest tree gaps disclosed — jsonschema 4.5.1,
-   no tqdm/textual) + real-GPU/vision execution still unexercised; #630 terminal layer (inert
-   /usr/share vs Rust crates); #631 REWORKED per geaaru to the control-tarball shape (reply posted
-   on #949 + pointer on the PR) — engines stay runtime unless he asks for USE gating (matrix
-   evidence in the PR body).
-3. Between tasks run the §8 feedback sweep.
+2. **RUNNING 2026-11-20**: geaaru's morning-before rounds — #628 install-layout inline (kill
+   /usr/share/maya/build via sed, direct /usr/bin entry, downloads out of /usr/share → var/home)
+   on `ses_e09d3344affe…` (containers 932+932-exp); #631 engines-back-IN per maintainer call
+   (USE-gated per-backend assets + arm64 custom USEs + required_use arch ties, drop KEYWORDS line,
+   fluctuation problem = central probe) on `ses_e09d3344affd…` (container 949). Reply drafts →
+   orchestrator posts. **Done direct**: geaaru's tqdm/textual request → filed #950/#951
+   (package-request shape per #439; confirmation posted on #628).
+3. Watch #628 / #630 / #631 for further threads — same-day, fresh captured proof. Remaining open
+   decisions: #628 PY_PACKAGES-parity offer (now gated on #950/#951 landing); #630 terminal layer
+   (inert /usr/share vs Rust crates).
+4. Between tasks run the §8 feedback sweep.
 
 ## Open follow-ups (not blockers, do not invent fixes)
 - #628 discloses: maya.py runtime venv/self-rebuild flow is not reproduced by the package (upstream
