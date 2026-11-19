@@ -20,7 +20,7 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 |---|---|---|---|
 | OPEN awaiting review (1 commit `d47be0a`, MERGEABLE) | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
-| UNCLAIMED | app-ai/strata-bin (AppImage + per-backend assets; version-skew + atom-granularity flagged) | #949 (filed, sub-issue of #930) | — |
+| UNCLAIMED → IN PROGRESS (probe-first loop dispatched 2026-11-19, session `ses_e0bb426fc…`) | app-ai/strata-bin (AppImage + per-backend assets; version-skew + atom-granularity flagged) | #949 (claimed; probe-first brief — AppImage unpack is NEW ground, evidence-round acceptable) | — |
 
 ## Sandboxes (one-container rule, §6)
 - `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head).
@@ -33,6 +33,10 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   + `app-ai/strata-0.2.16` installed; sandbox ai-kit
   reverted (0 dirt); `/etc/portage/package.license` (NVIDIA-CUDA) + `933-*` package.use persist —
   needed for any rebuild here. `clean-base` intact — keep container until #630 merges, then prune.
+- `mark-contrib-949` — Strata-bin probe loop (session `ses_e0bb426fc…`). `/kit-fixups` at head
+  `09cac49`, branch `strata-bin-autogen-949` when it runs. **No GPU**; probe downloads ~350 MB of
+  AppImage+control+engine assets under `/root/b949`. AppImage extraction may need `sys-fs/squashfs-tools`.
+  Keep until the strata-bin outcome (PR or evidence round) lands.
 - Known toolkit landmines in the image (all disclosed on #628): nvidia-cuda-toolkit 12.9.2 fails
   vs glibc-2.41 (`cospi/sinpi`), 13.3.1 ships 0 cccl files vs its CMake config; **13.2.1 is the
   working tree state**. **Pre-staging a toolkit install: drop `-a`/`--ask` (dies in non-terminal)
@@ -44,10 +48,9 @@ Answer review comments only on PRs whose head-commit trailer says
 `LLM-assisted-by: Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext) via OpenCode`.
 
 ## Task order (suggested)
-1. **#949 strata-bin** — the only unclaimed child. Claim-comment first (verify it's unclaimed:
-   re-sweep comments + `gh pr list --repo macaroni-os/kit-fixups --search "strata" --state all`).
-   The AppImage unpack has NO tree precedent (code-searched) — probe-first loop, stop with an
-   evidence round if the unpack phase needs a maintainer nod.
+1. #949 strata-bin — loop running (see board). When it returns: merge-gate the AppImage decision or
+   post its evidence round on the issue; engine-payload non-packaging recommendation should be
+   echoed on #949 for maintainers either way.
 2. Answer any #628 / #630 review threads (same-day, fresh captured proof). Watch for the terminal-
    layer decision on #630 (inert /usr/share data vs Rust crates — the PR body lays out options).
 3. Between tasks run the §8 feedback sweep (clean as of 2026-11-19 ~14:00Z: no comments/reviews on
