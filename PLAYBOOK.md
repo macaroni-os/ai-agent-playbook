@@ -728,6 +728,23 @@ Known rough edges:
      move there is a follow-up opportunity, not a prerequisite for a package conversion (the
      libpcre conversion was merged as-is).
 
+  57. **`autogen.kit.d/` layout: spec FILES are flat; subdirs are files_dir payloads only**
+      (ai-kit `app-ai/maya` #932, kit-fixups#628): a new atom's cluster goes into the kit's flat
+      spec file (appended to `ai-kit/autogen.kit.d/base.yml` or a new flat `<name>.yml`), NOT a
+      `<name>/base.yml` — the depth-2 directories there (e.g. `ollama/`) hold only the `files_dir`
+      payloads (confd/initd/service/envd) that `mark-devkit --specfile` consumes as flat files.
+      Same round, three reusable new-package shapes: (a) upstream CMake projects that
+      `FetchContent`-clone a pinned dependency at configure time become hermetic by adding that
+      exact commit as a SECOND spec `assets:` entry and pointing upstream's own local-directory
+      switch at it (`STRATA_GGML_DIR` for project-maya; nvcc's include path inside the sandbox
+      build is the proof); (b) a `undefined reference` link fail that appears ONLY through portage
+      (raw build green) is usually the eclass build type lacking `NDEBUG` — fix spec-side with
+      `extra_envs: ['CMAKE_BUILD_TYPE=Release']` (renders pre-`inherit`) and prove it with `nm`
+      symbol counts on the raw vs failed object; (c) when upstream gates the main target behind
+      GPU backends (`if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)` → configure succeeds but builds
+      NO target), the honest spec requires the GPU USE flag instead of pretending a CPU shape —
+      say so in the PR and reproduce the no-backend build to show the missing target.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
