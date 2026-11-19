@@ -750,6 +750,25 @@ Known rough edges:
       NO target), the honest spec requires the GPU USE flag instead of pretending a CPU shape —
       say so in the PR and reproduce the no-backend build to show the missing target.
 
+  58. **AppImage `-bin` atoms: two unpack traps, both spec-side** (ai-kit `app-ai/strata-bin` #949,
+      kit-fixups#631): (a) portage `unpack()` does NOT dispatch `.AppImage` (empty WORKDIR, fails
+      later with `chmod: cannot access '<app>.AppImage'`) — stage it explicitly with
+      `cp "${DISTDIR}/${A}"` (the jq-bin/plantuml intact-archive idiom) then run `--appimage-extract`;
+      (b) a Tauri/linuxdeploy AppImage **self-extracts headless with no system unsquashfs** (proved
+      in a clean dir with unsquashfs removed → no BDEPEND needed) but **plain `unsquashfs` on the raw
+      asset FAILS** (`Can't find a SQUASHFS superblock`) — the naive fallback is not an option, so
+      `--appimage-extract` is the ONLY extraction path. Install to `/usr/lib/<pn>/` with a
+      `/usr/bin` symlink (pi-bin idiom); the unpacked `usr/bin` binary is the `Exec=` name so pick
+      that as the symlink target (upstream's own name → `strata-desktop`), avoiding a collision with
+      a same-upstream SOURCE atom (here `/usr/bin/strata*` from #630 vs `/usr/bin/strata-desktop` —
+      disjoint by file-set, so NO mutual-block, unlike opencode/opencode-bin which share the path).
+      Two disclosures that held the verification bar honest: bundled webkit means the system RDEPEND
+      is only the ~8-lib host base (ldd 0 unresolved), and a headless GUI launch aborts at `Failed to
+      initialize GTK` — capture the startup trace (host served, engine-absence handled) as the smoke,
+      never claim rendering. The RDEPEND closure can pull a mesa that hits the python-3.10 floor
+      (see the loop's tree note) — pin the tree's older mesa in the sandbox to build, remove the pin
+      before hand-off, and disclose it.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
