@@ -698,6 +698,36 @@ Known rough edges:
      `media-kit/autogen.kit.d/base.yml`, the ffmpeg cluster). Same rule for `test` USE: core/tool
      packages drop it and pass the build-system toggle explicitly (e.g. `-DBUILD_TESTING=OFF`).
 
+ 55. **The spec schema is `pkg/specs/definition_autogen.go`, not the examples** (geaaru on
+     macaroni-os/kit-fixups#627, 2026-11-19: "add a note on your playbook about check syntax based
+     on this definition"). When the *level* of a key is in doubt, read the structs —
+     `AutogenDefinition` (`template`, `generator`, `generator_opts`, `defaults`, `packages`,
+     `extensions_defs`, `markdevkit_min_version`) vs `AutogenAtom` (`assets`, `selector`,
+     `revision`, `files_dir`, `category`, `transform`, `exclude`, `ignore_artefacts`, `vars`, …)
+     vs `AutogenAsset` (`name`, `url`, `matcher`, `use`, …). Unknown or misplaced keys do not
+     fail the run: they are silently dropped and the generator still exits rc 0 with "All done".
+     - **`assets` is an atom-level key** — a peer of `vars:` on a definition's `defaults:` or on a
+       package entry, NOT a field inside `vars:`. `assets` under `vars:` generated an ebuild with
+       **no `SRC_URI` at all** while the run reported success (libpcre, kit-fixups#627 probe).
+     - **Manifest digests come from `assets`**: `pkg/autogen/package.go` downloads every asset and
+       sets `.Values.src_uri` from the FIRST artefact. A hand-written `src_uri:` var renders
+       verbatim, but its Manifest digest is not elaborated correctly, and `mirror://` is resolved
+       only for legacy/old ebuilds (and macaroni bundles) — pin the real download address in
+       `assets.url` instead, including for pinned `builtin-noop` conversions. Captured (libpcre
+       8.44): `SRC_URI="https://downloads.sourceforge.net/pcre/pcre-8.44.tar.bz2 -> pcre-8.44.tar.bz2"`,
+       then `emerge -1` rc 0 with the Manifest generated from the downloaded asset.
+
+ 56. **`global_settings` is the reserved file-level key for shared options — not a package
+     definition** (same #627 review: "check the possibility in the autogen file if we can migrate
+     options common to all packages to `global_settings` key and reduce lines"). It is not a
+     definition: `ProcessDefinitions` skips it in the loop and `MergeDefinition`s it into every
+     definition of the same file, so its `defaults:`, `template:`, `generator_opts:`,
+     `extensions_defs:` and `markdevkit_min_version:` are inherited (packages are NOT merged).
+     Use it only at file top level to hoist options common to all clusters and cut duplicated
+     lines; never name a real cluster `global_settings`. Auditing an existing file for what can
+     move there is a follow-up opportunity, not a prerequisite for a package conversion (the
+     libpcre conversion was merged as-is).
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -728,6 +758,7 @@ Known rough edges:
 | `vendor/` is complete but the build still hits `proxy.golang.org` / `network is unreachable` | `go-module` exports `GOFLAGS=…-mod=readonly`, defeating Go's vendor auto-selection — re-export `GOFLAGS="-v -x -mod=vendor"` in `src_compile` (§3.43) |
 | upstream has no GitHub/Forgejo/GitLab, only a cgit repo | `builtin-dirlisting` on the cgit tags page (`<repo>/refs/tags/` lists `snapshot/…tar.xz` links — passt pattern, §3.45); no pinned noop needed |
 | `builtin-dirlisting` selected but upstream home is an HTML **download page** (not an autoindex) | mark-devkit joins `dir.url + "/" + href` verbatim → a page URL yields `…/download.html/less-710.tar.gz` 404 + ZERO artifacts with rc 0 (§2 assert): keep the page as `dir.url` for version discovery but pin `assets[].url` with a `{{ .Values }}` template (precedents: libcap, elfutils, less macaroni-os/kit-fixups#605) |
+| generated ebuild has **no `SRC_URI`** or the Manifest digest is wrong | `assets` is an atom-level key (peer of `vars:`, under `defaults:` or the package entry) — under `vars:` it is silently dropped and the run still prints "All done"; a hand-written `src_uri:`/`mirror://` is not digested correctly, so use `assets: - name/url` with the real download address (§3.55) |
 | rootless container image pull dies `mkdir /var/tmp/container_images_storage…: permission denied` | the sandbox `/var/tmp` is not the standard 1777 — fix the container mode, not the spec (§7x) |
 | systemd unit models the API socket as `Environment=SOCKET=…` | upstream shape is a `.socket` unit + socket activation, with `EnvironmentFile=-/etc/conf.d/<pn>` only for `LOG_LEVEL`-style knobs (§3.46) |
 | one PN needs a **legacy CVE-served track + floating tip** simultaneously | multiple `packages:` entries for the SAME PN with per-entry `selector:` + `revision:` + `patches:` (gcc-cluster precedent; sys-devel/patch macaroni-os/kit-fixups#601 generated `2.7.6-r4` with 12 live patches AND the 2.8.1 tip from one `--pkg patch` run; `.Values.p` excludes `-rN`, so bumping a revisioned track keeps the distfile pair stable, §3.26) |
