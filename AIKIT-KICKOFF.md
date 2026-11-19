@@ -18,12 +18,21 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 ## Board (captured 2026-11-19; re-verify via API at session start)
 | state | item | issue | PR |
 |---|---|---|---|
-| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11); rebuild loop RUNNING (session `ses_e0b408742…`, container `mark-contrib-932-exp`) | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
+| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`); geaaru's turn | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
 | OPEN awaiting review (1 commit `44bc023`, MERGEABLE; AppImage-only minimal shape, engine non-package recommendation + control-bin option on the issue) | app-ai/strata-bin | #949 (claimed; probe evidence posted) | kit-fixups#631 |
 
 ## Sandboxes (one-container rule, §6)
-- `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head).
+- `mark-contrib-932-exp` — experimental-verification host (image `macaroni/mark-experimental` @ 20260909).
+  End state 2026-11-19: egosync RC=0 (34 kits, **all on `mark-unstable`** — no `mark-experimental` kit
+  branch exists anywhere; the IMAGE supplies python 3.11.16, mask `>=dev-lang/python-3.10` still in
+  core-kit). Installed: mark-devkit 0.36.1, nvidia-cuda-toolkit 13.2.1 (cccl OK), gcc profile
+  switched 16.2.0→**12.3.0** (nvcc 13.2.1 hard-refuses gcc>15 — configure abort), `app-ai/maya-1.1.67`
+  from the amended spec (`/var/db/pkg` ebuild sha `b8c625b5…` == 932's). `/kit-fixups` at PR head
+  `b6c520e` (porcelain 0), ai-kit carries untracked deployed `app-ai/maya/`, evidence tree
+  `/root/exp932/` (gen, gen2, emerge*.log, pre-stage.log, closure.sh). Keep until #628 merges.
+- `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head `b6c520e`
+  after the jinja amendment + force-with-lease push 2026-11-19 ~17:45Z).
   **`clean-base` snapshot must NOT be renewed**: the current state (nvidia-cuda-toolkit-13.2.1,
   installed app-ai/maya, `/root/maya932` logs) IS the verified build environment for review
   rounds. Prune the container after #628 merges. Meta-repo ai-kit carries untracked
@@ -37,10 +46,8 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   @ `44bc023` = PR head (porcelain 0), `/root/b949` probe artifacts (assets + extracted trees + logs),
   squashfs-tools/mesa-25.3.6/X-stack/strata-bin installed as verification byproducts; ai-kit working
   copy restored. Keep until #631 merges, then prune. NOTE the mesa pin was sandbox-only and removed.
-- `mark-contrib-932-exp` — experimental-verification host (new image family: launched 2026-11-19
-  from `macaroni:macaroni/mark-experimental` @ 20260909, python 3.11.16 preferred, **no /root at
-  first boot (§2 quirk — mkdir done), no meta-repo materialized — `ego sync` bootstraps it**
-  (detached `/root/egosync.log`), no kit-fixups/mark-devkit by default — loop bootstraps those).
+- `mark-contrib-932-exp` — experimental-verification host — end state recorded above (first bullet of
+  this section).
 - Known toolkit landmines in the image (all disclosed on #628): nvidia-cuda-toolkit 12.9.2 fails
   vs glibc-2.41 (`cospi/sinpi`), 13.3.1 ships 0 cccl files vs its CMake config; **13.2.1 is the
   working tree state**. **Pre-staging a toolkit install: drop `-a`/`--ask` (dies in non-terminal)
@@ -52,10 +59,9 @@ Answer review comments only on PRs whose head-commit trailer says
 `LLM-assisted-by: Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext) via OpenCode`.
 
 ## Task order (suggested)
-1. **FEEDBACK (top priority)**: #628 geaaru rebuild-on-experimental — running (session
-   `ses_e0b408742…`). When it returns: post the reply on #628; if the spec amended (dev-python
-   atoms now declarable on 3.11), confirm the force-push moved the PR head + mark-unstable proof
-   intact.
+1. **FEEDBACK: #628 geaaru rebuild-on-experimental — DONE 2026-11-19.** Reply posted
+   (`issuecomment-7017251111`), amendment `b6c520e` verified on both trees, PR head confirmed.
+   Maintainer's turn; watch for the next thread.
 2. Watch #630 / #631 for maintainer threads — same-day, fresh captured proof. Open decisions the
    loops surfaced for maintainers: #630 terminal layer (inert /usr/share vs Rust crates); #631
    atom-granularity (control-bin split? engine confirmed non-packaged).
@@ -63,7 +69,9 @@ Answer review comments only on PRs whose head-commit trailer says
 
 ## Open follow-ups (not blockers, do not invent fixes)
 - #628 discloses: maya.py runtime venv/self-rebuild flow is not reproduced by the package (upstream
-  source-hash meta file); Python ≥3.10 floor masks the dashboard today (no dev-python atoms declared).
+  source-hash meta file); Python ≥3.10 floor still masks the dashboard on mark-unstable (only
+  `dev-python/jinja` is declared — the sole unguarded third-party import; PIL/psutil/jsonschema are
+  runtime-guarded upstream-side).
 - #630 discloses: terminal layer deferred on the 3.10 floor (upstream bundles a private CPython) —
   maintainer pick between inert `/usr/share` data (Maya-style) and the Rust `terminal/crates` CLI;
   HIP/SYCL backends unbuilt/unflagged (YAML-commented); the `0.2.0-beta` tag is NOT prerelease-marked
@@ -87,6 +95,7 @@ Answer review comments only on PRs whose head-commit trailer says
   self-extracts headless (no squashfs BDEPEND) but portage `unpack()` skips `.AppImage` → spec stages
   from DISTDIR; engine payloads evidence-backed non-packaged (embedded control dup + signed feed),
   control-bin split left to maintainers; PR #631 + evidence comment. Then **geaaru feedback on #628**
-  (rebuild maya on `macaroni/mark-experimental`, python 3.11) — rebuild loop running in
-  `mark-contrib-932-exp`. Feed every review lesson back into PLAYBOOK.md and refresh THIS file each
-  session.
+  (rebuild maya on `macaroni/mark-experimental`, python 3.11) — rebuilt green on the venue (spec
+  rendered byte-identical cross-tree), `import serve.server` proven on 3.11, amendment `b6c520e`
+  (+`dev-python/jinja`, closure-proven) verified on BOTH trees, reply posted same day. Feed every
+  review lesson back into PLAYBOOK.md and refresh THIS file each session.

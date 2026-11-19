@@ -82,6 +82,15 @@ Known rough edges:
   repo rename the old URL 404s — `could not read Username for ...` means the REMOTE IS GONE, not a
   bad token. Check `gh api repos/<owner>/<repo> --jq .full_name` before touching credentials, and
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
+- **`macaroni/mark-experimental` is a venue, not a kit branch** (maya #932 feedback round, 2026-11-19):
+  the Incus image from the `macaroni` remote syncs all 34 kits on `mark-unstable` (`ego sync`, `release =
+  mark-unstable` in `/etc/ego.conf`) — its actual supply is a **prebuilt python 3.11.16 userspace** over
+  the same kits (the `>=dev-lang/python-3.10` mask is still in the tree). Two traps: the image defaults
+  **gcc 16.2.0, which nvcc ≤13.2 rejects** (`unsupported GNU version! gcc versions later than 15`) —
+  `gcc-config` to the shipped 12.x before any CUDA configure; and the image ships **no /root, no
+  meta-repo, no mark-devkit** — bootstrap order: `mkdir -p /root`, detached `ego sync` (sentinel),
+  then `emerge mark-devkit nvidia-cuda-toolkit` (license seed §2). Cross-tree proof that works: gen the
+  same spec in both containers and assert `sha256sum` of the generated ebuild+Manifest are equal.
 - **Background emerges die on interaction and masks** (strata #933 pre-stage, 2026-11-19): a detached
   `emerge -1av` never prompts — `--ask` in a non-terminal silently kills the install; masked licenses
   (e.g. `NVIDIA-CUDA` for `dev-util/nvidia-cuda-toolkit`) abort in the resolver instead. Pre-staged
