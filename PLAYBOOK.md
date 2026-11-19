@@ -82,6 +82,11 @@ Known rough edges:
   repo rename the old URL 404s — `could not read Username for ...` means the REMOTE IS GONE, not a
   bad token. Check `gh api repos/<owner>/<repo> --jq .full_name` before touching credentials, and
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
+- **Background emerges die on interaction and masks** (strata #933 pre-stage, 2026-11-19): a detached
+  `emerge -1av` never prompts — `--ask` in a non-terminal silently kills the install; masked licenses
+  (e.g. `NVIDIA-CUDA` for `dev-util/nvidia-cuda-toolkit`) abort in the resolver instead. Pre-staged
+  dependency installs must drop `-a` AND seed `/etc/portage/package.license` first, and the
+  pre-stage script should end with a `qlist` assertion + `DONE` sentinel, never rely on rc alone.
 - **Never `shred -u` a script that bash is still executing** — the running wrapper's inode vanishes
   and the detached chain dies mid-phase without an error line. Detach a small launcher instead.
 - **`autogen-thin` with `GITHUB_TOKEN` unset fails SILENTLY** (patch #601, 2026-11-15): logs
