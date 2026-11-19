@@ -18,7 +18,7 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 ## Board (captured 2026-11-19; re-verify via API at session start)
 | state | item | issue | PR |
 |---|---|---|---|
-| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`); geaaru's turn | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
+| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`); geaaru's turn | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
 | OPEN awaiting review (1 commit `44bc023`, MERGEABLE; AppImage-only minimal shape, engine non-package recommendation + control-bin option on the issue) | app-ai/strata-bin | #949 (claimed; probe evidence posted) | kit-fixups#631 |
 
@@ -31,6 +31,10 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   from the amended spec (`/var/db/pkg` ebuild sha `b8c625b5…` == 932's). `/kit-fixups` at PR head
   `b6c520e` (porcelain 0), ai-kit carries untracked deployed `app-ai/maya/`, evidence tree
   `/root/exp932/` (gen, gen2, emerge*.log, pre-stage.log, closure.sh). Keep until #628 merges.
+  **Venue caveat (geaaru, hook `mark-stages/jobs/hooks/extras/python_upgrade.yml`):** the session's
+  bootstrap `ego sync` REVERTED the hook's make.defaults edit — `PYTHON_TARGETS/SINGLE_TARGET="python3_9"`
+  again (verified 2026-11-19; installed 3.11.16 + eselect persist). Any PYTHON_TARGETS-sensitive rebuild
+  here must re-apply the hook steps first (recipe in PLAYBOOK §2 venue entry).
 - `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head `b6c520e`
   after the jinja amendment + force-with-lease push 2026-11-19 ~17:45Z).
   **`clean-base` snapshot must NOT be renewed**: the current state (nvidia-cuda-toolkit-13.2.1,
@@ -81,8 +85,10 @@ Answer review comments only on PRs whose head-commit trailer says
 - **python-3.10 floor is now a tree-wide blocker (all three loops hit it)**: mark-unstable accepted
   interpreter is 3.9.25, so #932 maya dashboard (≥3.10), #933 strata terminal (≥3.10), and #949
   `media-libs/mesa-26.2.2` (`Python >= 3.10 not found` in its build) ALL fail on the same wall.
-  `mark-experimental` (3.11) is the maintainer-supplied relief — geaaru pointed #628 there; if a
-  bump to mark-unstable is wanted, file it as a core-kit/lang-kit issue rather than per-package.
+  `mark-experimental` (3.11) is the maintainer-supplied relief — geaaru pointed #628 there; it is the
+  mark-stages `python_upgrade` hook applied over mark-unstable kits (re-applied after every `ego
+  sync`), i.e. a venue, not tree policy yet; if a bump to mark-unstable is wanted, file it as a
+  core-kit/lang-kit issue rather than per-package.
 
 ## Freshness notes
 - 2026-11-19: epic split into #932/#933 (labels copied, sub-issue links verified, split comment on

@@ -84,12 +84,22 @@ Known rough edges:
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
 - **`macaroni/mark-experimental` is a venue, not a kit branch** (maya #932 feedback round, 2026-11-19):
   the Incus image from the `macaroni` remote syncs all 34 kits on `mark-unstable` (`ego sync`, `release =
-  mark-unstable` in `/etc/ego.conf`) — its actual supply is a **prebuilt python 3.11.16 userspace** over
-  the same kits (the `>=dev-lang/python-3.10` mask is still in the tree). Two traps: the image defaults
-  **gcc 16.2.0, which nvcc ≤13.2 rejects** (`unsupported GNU version! gcc versions later than 15`) —
-  `gcc-config` to the shipped 12.x before any CUDA configure; and the image ships **no /root, no
-  meta-repo, no mark-devkit** — bootstrap order: `mkdir -p /root`, detached `ego sync` (sentinel),
-  then `emerge mark-devkit nvidia-cuda-toolkit` (license seed §2). Cross-tree proof that works: gen the
+  mark-unstable` in `/etc/ego.conf`). Its python 3.11 is the **mark-stages `python_upgrade` hook**
+  (`jobs/hooks/extras/python_upgrade.yml`, geaaru 2026-11-19) applied at image-build time over those
+  kits — and **`ego sync` REVERTS its tree-side edits**: verified in-container — after sync,
+  `core-kit/profiles/funtoo/kits/python-kit/mark/make.defaults` reads `PYTHON_TARGETS="python3_9"`
+  again (kit git clean), while the installed `dev-lang/python-3.11.16`, the `eselect python set
+  python3.11` pick and `/etc/portage/package.unmask` persist. Recovery = the hook itself
+  (`python_version2upgrade: 3.11`): sed make.defaults, unmask, `emerge -j python python-exec
+  --nodeps`, `locale-gen`, rebuild `gobject-introspection glib --nodeps -j`,
+  `PYTHON_TARGETS=python3_11 PYTHON_SINGLE_TARGET=python3_11 emerge -DuvN @world`, eselect-set,
+  then unmerge python:3.9 + `rm -rf /usr/lib/python3.9`. Specs that inherit NO python eclass and
+  declare slot-less dev-python RDEPENDS are insensitive to the revert — #628's amended build proved
+  green post-sync with `python3_9` targets back. Two traps: the image defaults **gcc 16.2.0, which
+  nvcc ≤13.2 rejects** (`unsupported GNU version! gcc versions later than 15`) — `gcc-config` to the
+  shipped 12.x before any CUDA configure; and the image ships **no /root, no meta-repo, no
+  mark-devkit** — bootstrap order: `mkdir -p /root`, detached `ego sync` (sentinel), then
+  `emerge mark-devkit nvidia-cuda-toolkit` (license seed §2). Cross-tree proof that works: gen the
   same spec in both containers and assert `sha256sum` of the generated ebuild+Manifest are equal.
 - **Background emerges die on interaction and masks** (strata #933 pre-stage, 2026-11-19): a detached
   `emerge -1av` never prompts — `--ask` in a non-terminal silently kills the install; masked licenses
