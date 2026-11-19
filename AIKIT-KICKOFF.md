@@ -16,7 +16,8 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 | state | item | issue | PR |
 |---|---|---|---|
 | OPEN awaiting review (1 commit `d47be0a`, MERGEABLE) | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
-| UNCLAIMED | strata | #933 | — |
+| IN PROGRESS (source loop dispatched 2026-11-19) | app-ai/strata (source) | #933 (retitled from strata-bin per operator decision; scope-change comment posted) | — |
+| PLANNED follow-up | strata-bin (AppImage + engine/control assets, incl. engine-version-skew 0.1.62 vs 0.2.16) | child of #930, to open after the source PR | — |
 
 ## Sandboxes (one-container rule, §6)
 - `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head).
@@ -24,8 +25,10 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   installed app-ai/maya, `/root/maya932` logs) IS the verified build environment for review
   rounds. Prune the container after #628 merges. Meta-repo ai-kit carries untracked
   `app-ai/maya/` + `/etc/portage/package.use/maya932` (revert: `git clean` in the kit).
-- To spawn for Strata: `incus launch contrib-base mark-contrib-933` → sanity per §2 →
-  pull kit-fixups to head → own `clean-base`.
+- `mark-contrib-933` — Strata source loop. `/kit-fixups` at head `09cac49`, branch
+  `strata-autogen-933` when the loop runs. Background `emerge -1av =dev-util/nvidia-cuda-toolkit-13.2.1`
+  launched at dispatch (poll `/root/toolkit.log` for `DONE`); **no GPU in this container** — the
+  engine proof is compile+link only. Keep until the strata PR merges.
 - Known toolkit landmines in the image (all disclosed on #628): nvidia-cuda-toolkit 12.9.2 fails
   vs glibc-2.41 (`cospi/sinpi`), 13.3.1 ships 0 cccl files vs its CMake config; **13.2.1 is the
   working tree state**.
@@ -35,12 +38,15 @@ Answer review comments only on PRs whose head-commit trailer says
 `LLM-assisted-by: Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext) via OpenCode`.
 
 ## Task order (suggested)
-1. #933 Strata — claim-comment, then the loop recipe (baseline: unpack the linux AppImage +
-   `strata-control`/`strata-engine` tarballs in the sandbox and smoke them; decide per-backend
-   USE/atom shape or stop with an evidence round — the split question is already flagged on the
-   issue). Precedent: `opencode-bin`/`claude-code-bin`/`pi-bin` entries of `ai-kit/autogen.kit.d/base.yml`.
-2. Answer any #628 review threads (same-day, fresh captured proof).
-3. Between tasks run the §8 feedback sweep.
+1. #933 Strata SOURCE — loop dispatched 2026-11-19 (session `ses_e0c1049d5…`): baseline engine
+   build with CUDA 13.2.1 (headless, explicit arch, no `native`), Python terminal probe (Maya hit
+   the 3.9 tree floor), `builtin-github` riding the v-tags (4-part `v0.2.14.1` parser check),
+   autogen-thin render + ride proof, emerge byte-identical + smoke. Precedents: maya (#628) for the
+   CUDA/`gpus:` shape, ollama cluster for cmake/user.
+2. Open the `strata-bin` follow-up child once #933's source shape lands (AppImage unpack +
+   per-backend engine/control assets; opencode-bin/pi-bin idiom; version-skew note).
+3. Answer any #628 / strata-PR review threads (same-day, fresh captured proof).
+4. Between tasks run the §8 feedback sweep.
 
 ## Open follow-ups (not blockers, do not invent fixes)
 - #628 discloses: maya.py runtime venv/self-rebuild flow is not reproduced by the package (upstream
