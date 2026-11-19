@@ -18,9 +18,9 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 ## Board (captured 2026-11-19; re-verify via API at session start)
 | state | item | issue | PR |
 |---|---|---|---|
-| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`); geaaru's turn | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
+| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`). **Round 3 ANSWERED (2026-11-19 ~21:00Z)**: distutils-r1 = negative-proofed (setup.py has no setup()/pyproject — installer helper; pydeps/python_compat render NOTHING under builtin-github — throwaway probe; §3.59) + dep determination (static AST closure + headless mock-serve on 3.11 with optionals ABSENT) → jinja-only necessary&sufficient, NO atoms added; amendment `1ab51041` (comment-only, byte-identical render both trees), reply posted (`issuecomment-7020500555`) incl. the PY_PACKAGES-parity offer + honest tree gaps (jsonschema 4.5.1 < upstream pin; tqdm/textual absent) | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
-| OPEN awaiting review (1 commit `44bc023`, MERGEABLE; AppImage-only minimal shape, engine non-package recommendation + control-bin option on the issue) | app-ai/strata-bin | #949 (claimed; probe evidence posted) | kit-fixups#631 |
+| OPEN awaiting review — REWORKED per geaaru on #949 ("tarballs instead of AppImage"): now `strata-control`-tarball-based (version-free matcher rides the component skew per tag; engines stay runtime-fetched — per-release asset fluctuation + collision evidence in body); 1 commit `bcfc755` (was `44bc023`), reply posted (`issuecomment-7020417748`) + pointer on the PR | app-ai/strata-bin | #949 (claimed; probe + rework evidence posted) | kit-fixups#631 |
 
 ## Sandboxes (one-container rule, §6)
 - `mark-contrib-932-exp` — experimental-verification host (image `macaroni/mark-experimental` @ 20260909).
@@ -29,13 +29,13 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   core-kit). Installed: mark-devkit 0.36.1, nvidia-cuda-toolkit 13.2.1 (cccl OK), gcc profile
   switched 16.2.0→**12.3.0** (nvcc 13.2.1 hard-refuses gcc>15 — configure abort), `app-ai/maya-1.1.67`
   from the amended spec (`/var/db/pkg` ebuild sha `b8c625b5…` == 932's). `/kit-fixups` at PR head
-  `b6c520e` (porcelain 0), ai-kit carries untracked deployed `app-ai/maya/`, evidence tree
+  `1ab51041` (porcelain 0), ai-kit carries untracked deployed `app-ai/maya/`, evidence tree
   `/root/exp932/` (gen, gen2, emerge*.log, pre-stage.log, closure.sh). Keep until #628 merges.
   **Venue caveat (geaaru, hook `mark-stages/jobs/hooks/extras/python_upgrade.yml`):** the session's
   bootstrap `ego sync` REVERTED the hook's make.defaults edit — `PYTHON_TARGETS/SINGLE_TARGET="python3_9"`
   again (verified 2026-11-19; installed 3.11.16 + eselect persist). Any PYTHON_TARGETS-sensitive rebuild
   here must re-apply the hook steps first (recipe in PLAYBOOK §2 venue entry).
-- `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head `b6c520e`
+- `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head `1ab51041`
   after the jinja amendment + force-with-lease push 2026-11-19 ~17:45Z).
   **`clean-base` snapshot must NOT be renewed**: the current state (nvidia-cuda-toolkit-13.2.1,
   installed app-ai/maya, `/root/maya932` logs) IS the verified build environment for review
@@ -47,7 +47,8 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   reverted (0 dirt); `/etc/portage/package.license` (NVIDIA-CUDA) + `933-*` package.use persist —
   needed for any rebuild here. `clean-base` intact — keep container until #630 merges, then prune.
 - `mark-contrib-949` — Strata-bin loop DONE (PR #631). Outcome kept: branch `strata-bin-autogen-949`
-  @ `44bc023` = PR head (porcelain 0), `/root/b949` probe artifacts (assets + extracted trees + logs),
+  @ `bcfc755` = PR head (porcelain 0; tarball rework — AppImage leftovers irrelevant, `/opt/strata-bin`
+  + `/opt/strata-engine-cuda13` relocation probes kept), `/root/b949` probe artifacts (assets + extracted trees + logs),
   squashfs-tools/mesa-25.3.6/X-stack/strata-bin installed as verification byproducts; ai-kit working
   copy restored. Keep until #631 merges, then prune. NOTE the mesa pin was sandbox-only and removed.
 - `mark-contrib-932-exp` — experimental-verification host — end state recorded above (first bullet of
@@ -63,12 +64,15 @@ Answer review comments only on PRs whose head-commit trailer says
 `LLM-assisted-by: Qwen3.8 Flash-Next Q8_0 (125B MoE, 512K Kontext) via OpenCode`.
 
 ## Task order (suggested)
-1. **FEEDBACK: #628 geaaru rebuild-on-experimental — DONE 2026-11-19.** Reply posted
-   (`issuecomment-7017251111`), amendment `b6c520e` verified on both trees, PR head confirmed.
-   Maintainer's turn; watch for the next thread.
-2. Watch #630 / #631 for maintainer threads — same-day, fresh captured proof. Open decisions the
-   loops surfaced for maintainers: #630 terminal layer (inert /usr/share vs Rust crates); #631
-   atom-granularity (control-bin split? engine confirmed non-packaged).
+1. **FEEDBACK: #628 geaaru rounds 1–3 — ALL ANSWERED 2026-11-19** (experimental rebuild + jinja
+   amendment `b6c520e`; hook warning + venue recovery recipe; distutils-r1/RDEPEND determination →
+   `1ab51041`, replies posted). Maintainer's turn; open offer on the table = PY_PACKAGES parity set.
+2. Watch #628 / #630 / #631 for maintainer threads — same-day, fresh captured proof. Open decisions
+   now: #628 PY_PACKAGES-parity offer (geaaru's call; honest tree gaps disclosed — jsonschema 4.5.1,
+   no tqdm/textual) + real-GPU/vision execution still unexercised; #630 terminal layer (inert
+   /usr/share vs Rust crates); #631 REWORKED per geaaru to the control-tarball shape (reply posted
+   on #949 + pointer on the PR) — engines stay runtime unless he asks for USE gating (matrix
+   evidence in the PR body).
 3. Between tasks run the §8 feedback sweep.
 
 ## Open follow-ups (not blockers, do not invent fixes)
@@ -103,5 +107,8 @@ Answer review comments only on PRs whose head-commit trailer says
   control-bin split left to maintainers; PR #631 + evidence comment. Then **geaaru feedback on #628**
   (rebuild maya on `macaroni/mark-experimental`, python 3.11) — rebuilt green on the venue (spec
   rendered byte-identical cross-tree), `import serve.server` proven on 3.11, amendment `b6c520e`
-  (+`dev-python/jinja`, closure-proven) verified on BOTH trees, reply posted same day. Feed every
+  (+`dev-python/jinja`, closure-proven) verified on BOTH trees, reply posted same day. Same evening:
+  geaaru's hook-warning round (answered; §2 venue entry + recovery recipe), his distutils-r1/
+  RDEPEND round on #628 (answered — determination, no atoms added, head `1ab51041`; §3.59), and the
+  #949 tarball-rework of #631 (head `bcfc755`, version-free matcher; §3.58 follow-up). Feed every
   review lesson back into PLAYBOOK.md and refresh THIS file each session.

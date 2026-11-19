@@ -786,7 +786,33 @@ Known rough edges:
       initialize GTK` — capture the startup trace (host served, engine-absence handled) as the smoke,
       never claim rendering. The RDEPEND closure can pull a mesa that hits the python-3.10 floor
       (see the loop's tree note) — pin the tree's older mesa in the sandbox to build, remove the pin
-      before hand-off, and disclose it.
+      before hand-off, and disclose it. FOLLOW-UP (same PR, geaaru: "use the linux tarballs instead
+      of the AppImage"): the shipped shape became the `strata-control` TARBALL — and the rework
+      produced the pattern for **-bin atoms whose component assets version independently of the app
+      tags** (control 0.1.62 @ v0.2.16, 0.1.61 @ v0.2.15, dual 0.1.60/0.1.60.1 @ v0.2.14 — so
+      `{{ .Values.version }}`-templated asset names are IMPOSSIBLE): use a VERSION-FREE `matcher:`
+      (`strata-control-[0-9.]+-linux-x86_64\.tar\.gz`) resolved against the *selected release
+      itself*, and rename the distfile to the app version (`name:`) so it stays unique per PV;
+      prove the ride with two selector renders (`<0.2.16` → the 0.1.61 asset). Per-release asset
+      fluctuation is a packaging argument too: v0.2.15 ships NO x86_64 engine assets at all, so
+      `use:`-gated engine entries would hard-break autogen on such tags — verify the full per-tag
+      asset matrix (Release-API sweep) before gating anything.
+
+  59. **mark-devkit's python machinery is `builtin-pypi`-only — don't reach for distutils-r1**
+      (maya #932 review round, kit-fixups#628, geaaru "Why doesn't use the distutils-r1 eclass?"):
+      `python_compat`/`pydeps`/`pypi_name` are fed ONLY by the PyPI generator (`builtin_pypi.go`) and
+      consumed ONLY by `pypi-generic.tmpl` (the sole tree template with `inherit distutils-r1`) —
+      under `builtin-github` they render NOTHING (proved by a throwaway spec render, restored after:
+      identical ebuild). For app-embedded Python that runs on the SYSTEM interpreter: declare
+      slot-less `dev-python/*` RDEPENDs WITHOUT `${PYTHON_USEDEP}` (target-pinning would misclaim on
+      release branches where `make.defaults` resolves only `python3_9`), and answer "missing deps"
+      with a determination, not a guess: static AST closure over the INSTALLED tree (module-level
+      unguarded imports only) PLUS a dynamic headless run of the app's serve entry (mock/no-model
+      mode where it exists) on the version the app needs, with the optional packages absent —
+      guarded imports surfacing their own `pip install …` errors are the proof they stay
+      undeclared. Before offering a full `PY_PACKAGES`-parity list, sweep the tree for each atom:
+      maya's parity would need `jsonschema>=4.18,<5` (tree serves 4.5.1), plus `tqdm`/`textual`
+      which DON'T EXIST — offer parity only with the honest diff disclosed.
 
 ## 4. Fix-pattern quick table
 
