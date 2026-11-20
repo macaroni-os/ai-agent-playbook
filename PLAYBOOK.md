@@ -90,7 +90,9 @@ Known rough edges:
   `core-kit/profiles/funtoo/kits/python-kit/mark/make.defaults` reads `PYTHON_TARGETS="python3_9"`
   again (kit git clean), while the installed `dev-lang/python-3.11.16`, the `eselect python set
   python3.11` pick and `/etc/portage/package.unmask` persist. Recovery = the hook itself
-  (`python_version2upgrade: 3.11`): sed make.defaults, unmask, `emerge -j python python-exec
+  (`python_version2upgrade: 3.11`; the LIVE hook is now `3.13`-targeted — full fresh-container
+  reproduction sequence in §3.61, and beware the drift check there before trusting python smokes):
+  sed make.defaults, unmask, `emerge -j python python-exec
   --nodeps`, `locale-gen`, rebuild `gobject-introspection glib --nodeps -j`,
   `PYTHON_TARGETS=python3_11 PYTHON_SINGLE_TARGET=python3_11 emerge -DuvN @world`, eselect-set,
   then unmerge python:3.9 + `rm -rf /usr/lib/python3.9`. Specs that inherit NO python eclass and
@@ -830,6 +832,54 @@ Known rough edges:
       sanctioned stand-in for multi-USE asset conditions (geaaru's own prescription); aarch64
       verification without an arm64 sandbox stays gen-level, disclosed. Feature ask drafted (not
       filed): `assets[].optional: true` → zero-hit = skip with WARN, no artefact/digest/SRC_URI.
+
+  61. **macaroni python venues drift; reproduce the `python_upgrade` hook, then check
+      installed-vs-active libdir before trusting any python smoke** (maya #932, geaaru 2026-11-20,
+      after a venue run passed only because the image's python and its dev-python files happened to
+      agree): the `macaroni/mark-experimental` image ships `dev-lang/python-3.11.16` +
+      `eselect python3.11` + 3.9 already unmerged, and the user's own container showed the drift:
+      `dev-python/pillow-12.2.0-r1` installed against `python3.13` REQUIRES with a `3.13`-libdir
+      file set (2602 files) while `python3` ran **3.11** — `import PIL` failed. The hook's own
+      migration tools CANNOT fix that (`python-updater`/`@python-module-updates --use-old-libdir`
+      only consider already-installed atoms; every emerge line is `--noreplace` = "do not
+      re-emerge installed") — a same-version `emerge` is a no-op on the FILES: portage never
+      rewrites what is already installed, so a re-emerge "copies" the old files in the sense that
+      nothing is rebuilt; `--force-reinstall`/`--nodeps` don't target the drift either (the
+      interpreter switch does not mark same-version deps out-of-date without the `changed-deps`
+      feature). Surgical fix for a drifted package: `emerge --unmerge <cpv> && emerge -1av
+      <cpv>` (re-merges clean against the active interpreter — pillow → 2595 files, `cmp`-equal
+      to a reference install; maya itself was never drifted so a re-emerge was pointless — its
+      serve smoke was already valid). Reproducing the hook on a fresh container (target 3.11);
+      the LIVE hook (`jobs/hooks/extras/python_upgrade.yml` @ phoenix) now carries
+      `python_version2upgrade: 3.13` and `--ignore-srmask '*/*::python-kit'` (NOT
+      `--ignore-package-mask`): sed `PYTHON_(SINGLE_)TARGETS` in
+      `core-kit/profiles/funtoo/kits/python-kit/mark/make.defaults` → unmask `=dev-lang/python-3.11*`
+      + mask `>=dev-lang/python-3.9` (write INSIDE the `package.unmask`/`package.mask`
+      DIRECTORIES — the image has them as dirs, so the hook's `echo > file` form silently fails) →
+      `--noreplace python python-exec` (no `-1`: this is what lands python in `world`) →
+      `ego update world` (rewrites world from installed — why the user's world says 3.11) → locale
+      entries + `locale-gen` → `--noreplace gobject-introspection glib` → `--noreplace @world` →
+      `eselect python set python3.11` → `python-updater -a --ignore-safepause --noreplace` →
+      `emerge -1 --noreplace @python-module-updates --use-old-libdir` → final `--noreplace python`
+      → old-python removal (`emerge --unmerge dev-lang/python:3.9` + `rm -rf /usr/lib/python3.9` —
+      SKIP the hook's bare `emerge --unmerge python`: on an image-built state the only matching
+      package IS the active interpreter) → `revdep-rebuild -q`. Drop `--ask` everywhere (detached).
+      Venue-boot gotchas: `dev-util/mark-sdk` does not exist and its presence KILLS the whole
+      emerge line (boot `dev-util/mark-devkit` alone); `autogen-thin` is not a binary — run
+      `mark-devkit autogen-thin`; autogen hard-fails ("Missing git token! Push interrupted!")
+      without `GITHUB_TOKEN` even in thin mode; `--specfile autogen.kit.d/base.yml --kitfile
+      merge.kit.d/base.yml` are relative to the KIT dir (`cd /kit-fixups/ai-kit`); the version
+      `selector:` goes INSIDE the `- <pn>:` package entry — at cluster level it is silently
+      ignored. A near-daily upstream can bump mid-session (project-maya v1.1.67→v1.1.68 during
+      this very run): autogen correctly rode it, so when the verification target is the
+      PR-emerged artifact, pin a throwaway selector (`['<1.1.68']` → byte-identical 1.1.67 render,
+      sha256 `b8c625b5…`) and report the new tag to the orchestrator. And on venue boot check
+      whether `/etc/portage/package.{use,unmask,mask}` and `package.license` are FILES or
+      DIRECTORIES (the experimental image ships `package.use`/`package.license` as dirs): a
+      `echo "cat/pkg flag" >> /etc/portage/package.use` dies with "Is a directory", and behind
+      `|| true` it silently builds WITHOUT the intended USE — maya exp2 lost its `cuda` this way
+      (870 files, no engines vs the intended 876/6); write inside the dir
+      (`package.use/<name>`) and assert the `qlist` file count against the reference venue.
 
 ## 4. Fix-pattern quick table
 
