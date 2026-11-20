@@ -1243,6 +1243,29 @@ bb. **Python edit-scripts that call `write_text` twice from a stale `t` silently
    one variable, write once, and after any multi-edit script GREP the final file for both edits
    (and for what must be gone) before committing.
 
+cc. **Rebase keep-both on a top-level-cluster conflict must be reconstructed, not
+    marker-stripped** (maya #628 rebase onto post-#630 `mark-unstable`, 2026-11-20): the maya
+      cluster and the merged strata cluster BOTH append a new top-level key at the EOF of
+      `ai-kit/autogen.kit.d/base.yml`, so git reports a content conflict with the two keys
+      side-by-side. Deleting the `<<<< ====> >>>>` lines keeps BOTH full cluster bodies — but they
+      are already BOTH in the conflicted region, so the result was a file where `strata:` (line
+      1143) and `maya:` (1144) sat adjacent with strata's whole block stranded INSIDE maya (1567
+      lines vs the correct 1677; autogen then aborts with no ebuild — §7e silent-success caught it
+      via the artifact assert). The correct fix is deterministic reconstruction, not merge
+      cleverness: `git show origin/<br>:<file> > file` (the clean upstream file, strata intact)
+      then `git show <our-head>:<file> | awk '/^maya:/{f=1} f' >> file` (append ONLY our cluster
+      from our own pre-rebase commit) — then assert the two invariants: head-of-file `diff` against
+      upstream is empty (PREFIX-IDENTICAL) and the tail `diff` against our commit is empty
+      (TAIL-IDENTICAL). `merge.kit.d` conflicted the same way but is a flat list where the naive
+      strip WAS right (verify by `diff` vs upstream = exactly the one added `- pkg:` line). ALWAYS
+      re-verify by regenerating EVERY top-level cluster in the file (both maya AND strata from the
+      rebased spec), not just yours — the strata generation is what proved the neighbor survived;
+      the render diff against your own pre-rebase ebuild shows only the version-line bump (tip
+      rode 1.1.68→1.1.69 mid-rebase) — regenerate the OLD head to the SAME tip and cmp
+      BYTE-IDENTICAL to separate "my rebase broke it" from "upstream moved". autogen-thin needs
+      `--kitfile merge.kit.d/base.yml` too (rc=1 "No kitfile param defined" without it, and `--ask`
+      is never used).
+
 ## 8. Feedback sweep (do it between every task)
 
 ```
