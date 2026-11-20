@@ -915,6 +915,19 @@ Known rough edges:
       cheap-proof: render before + after and diff — if the ONLY hunks are comment lines, amend;
       anything else means the "comment" was artifact text or the edit touched structure.
 
+  64. **OpenRC payloads must be RUNTIME-cycled, and two failures only a real start reveals**
+      (maya #628 services round, 2026-11-20): (a) `enewuser/enewgroup` in `pkg_setup` needs the
+      **user** eclass in the spec `inherit:` list — the first merge died `enewuser: command not
+      found` (autogen-thin can't see this; only emerge does); (b) `start-stop-daemon --stdout
+      /var/log/x.log` opens the logfile AFTER dropping to the daemon uid → `Permission denied`
+      even with correct dir ownership; fix = `checkpath -f -m 0640 -u <user> -g <user> <log>` in
+      `start_pre` before the start. Cycle every init script end-to-end in the sandbox
+      (`rc-service <pn> start` → assert the daemon runs AS the user with the env you think you set
+      — read `/proc/<pid>/environ`, prove the HTTP surface → `stop` → assert gone; plus one
+      invalid-config refusal) and prove the `use systemd` branch separately by file placement
+      (unit cmp'd, initd absent, confd stays) — no PID1 in containers means the .service is
+      hand-reviewed only, which is the honest disclosure line.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
