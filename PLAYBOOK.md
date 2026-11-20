@@ -1294,7 +1294,14 @@ cc. **Rebase keep-both on a top-level-cluster conflict must be reconstructed, no
       rode 1.1.68→1.1.69 mid-rebase) — regenerate the OLD head to the SAME tip and cmp
       BYTE-IDENTICAL to separate "my rebase broke it" from "upstream moved". autogen-thin needs
       `--kitfile merge.kit.d/base.yml` too (rc=1 "No kitfile param defined" without it, and `--ask`
-      is never used).
+      is never used). APPEND MECHANICS (strata-bin #631 rebase onto post-#628, same day — self-inflicted
+      caught by the end-state audit): when re-extracting "our added line(s)" for a flat list like
+      merge.kit.d, NEVER pipe raw `git diff` output into the file — the leading `+` of diff lines
+      becomes literal content (a `+    - pkg: …` line made it into a rebase resolution; generators
+      may not even fail on it — the YAML parsed and autogen passed, so only the FINAL
+      `git diff origin/<br>..HEAD` + a `grep -c '^+ '` literal check caught it). Extract content,
+      not diffs: `git diff A B -- f | grep '^+ ' | sed 's/^+ //'` or just re-type the known line,
+      then re-assert the full pure-addition invariant before pushing.
 
 ## 8. Feedback sweep (do it between every task)
 
