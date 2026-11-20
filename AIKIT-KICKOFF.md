@@ -133,4 +133,13 @@ Answer review comments only on PRs whose head-commit trailer says
   sits on THIS branch (the aikit loop's); the §3.64 playbook lesson lives on `playbook/textual-951-glm`
   (worktree off phoenix) — merge that branch before/with this one; it does NOT touch this file's
   other lines.
+- **#634 review round ANSWERED 2026-11-20 ~10:30Z** (geaaru: platformdirs fix wanted in-PR + 2
+  inline notes): commit 2 `cc856ef` = platformdirs spec declares `hatch-fancy-pypi-readme` build
+  hook + `selector: '<4.14.6'` cap (>=4.14.6 needs `python-sbom[hatch]>=0.1.2` — every python-sbom
+  release requires py >=3.11, unpackageable on 3.9; cap drops with #879). Discriminating proof:
+  plugin unmerged → `emerge -1 =dev-python/platformdirs-4.14.5` pulls it via BDEPEND → rc=0,
+  byte-identical. Commit 1 amended: pygments `s:` DROPPED per maintainer (atom-level
+  `pypi_name: pygments` — the 0.36.1 default rendered capital-`Pygments` and died, evidence in
+  threaded reply) + mdit `s:` on `{{ .Values.pv }}`. Head `cc856ef` (2 commits), MERGEABLE clean;
+  threaded replies + issue reply posted. **Waiting on geaaru merge.**
 
