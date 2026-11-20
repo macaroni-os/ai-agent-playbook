@@ -111,3 +111,24 @@ Answer review comments only on PRs whose head-commit trailer says
   RDEPEND round on #628 (answered — determination, no atoms added, head `1ab51041`; §3.59), and the
   #949 tarball-rework of #631 (head `bcfc755`, version-free matcher; §3.58 follow-up). Feed every
   review lesson back into PLAYBOOK.md and refresh THIS file each session.
+
+## 2026-11-20 — textual-951 loop (GLM-5.3-Flash via OpenCode, branch playbook/textual-951-glm)
+
+- **#950 tqdm: MERGED** (macaroni-os/kit-fixups#633, mark-unstable-only, no release-branch PRs —
+  the operative propagation precedent for python-modules-kit).
+- **#951 textual: PR macaroni-os/kit-fixups#634 OPEN** (1 commit `838f17a`, rebased onto #633's
+  merge, MERGEABLE, `ai_ass` set; evidence comment posted on #951). Scope: `dev-python/textual`
+  8.2.8 + the full missing closure (markdown-it-py 3.0.0, mdit-py-plugins 0.4.2, linkify-it-py
+  2.0.3, mdurl 0.1.2, uc-micro-py 1.0.3) + rich/pygments converted to autogen (15.0.0 / 2.21.0,
+  atoms moved base.yml → python_autogen.yml per §3.6). Verified: full-chain emerge rc=0, 8/8
+  byte-identity, headless App smoke (Markdown+linkify). Disclosed: in-tree platformdirs-4.14.5
+  spec lacks `hatch-fancy-pypi-readme` build dep (pre-existing, untouched).
+- **#628 gate**: PY_PACKAGES-parity offer now waits only on #634 review (tqdm already in).
+- Sandbox `mark-contrib-951` (cloned from 932/clean-base): j2cli emerged, the 8 atoms installed,
+  `/root/gen951-post/` (post-rebase generated trees) + `/root/build951*.sh` kept as evidence.
+  Meta-repo python-modules-kit copy carries the deployed ebuilds (documented dirt). **Keep until
+  #634 merges, then prune.** NOTE: the ai-agent-playbook checkout in `~/Development/src/ai-agent-playbook`
+  sits on THIS branch (the aikit loop's); the §3.64 playbook lesson lives on `playbook/textual-951-glm`
+  (worktree off phoenix) — merge that branch before/with this one; it does NOT touch this file's
+  other lines.
+
