@@ -881,6 +881,23 @@ Known rough edges:
       (870 files, no engines vs the intended 876/6); write inside the dir
       (`package.use/<name>`) and assert the `qlist` file count against the reference venue.
 
+  62. **Two portage phase traps when a generated `src_install`/`src_prepare` does more than the
+      template default** (maya #932 layout round, kit-fixups#628, both caught only by a real
+      merge — `bash -n` passes both): (a) `newins` **respects the active `insinto`** — a
+      `src_install` that first does `insinto /usr/share/<pn>` and later `newins launcher` +
+      `fperms 0755 /usr/bin/launcher` stages the file under /usr/share/<pn> and dies in fperms
+      ("No such file or directory"); ship the executable with **`newbin`** (the house idiom,
+      EXEOPTS 0755, sets its own into) or an explicit `into`/`exeinto`. (b) This tree's portage on
+      **EAPI 7 does not dispatch the cmake eclass' exported `src_prepare` through `default`** — a
+      custom `src_prepare() { default; ... }` then dies in configure with `FATAL:
+      cmake_src_prepare has not been run`; call `cmake_src_prepare` explicitly *first* (pattern:
+      dev-util/opencl-icd-loader ebuilds), then sed the sources (seds after it are fine — the
+      eclass' module-strip only touches *.cmake). Related design rule learned the hard way mid-land:
+      before sed'ing an upstream "default path" constant, grep the function that uses it —
+      maya's `serve/models.py` fallback feeds `models_dirs()`, a storage listing that FILTERS
+      home-based folders out by design; sed'ing it silently disabled the listing while the real
+      download target (the `maya.py` chain) needed exactly one file's six sites.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -1215,6 +1232,16 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     before anything else, STOP if it's not yours (force-pushing over a foreign-trailer branch is
     forbidden); (b) keep the full verification package anyway (`/root/<pkg>*/`) — a STALE round's
     evidence is directly reusable if the winning PR fails review.
+
+
+bb. **Python edit-scripts that call `write_text` twice from a stale `t` silently revert the first
+   edit** (maya #932 layout round, observed 2026-11-20): a spec-edit script did
+   `p.write_text(t.replace(a, b))` and then, for a second edit, recomputed from the ORIGINAL `t`
+   and overwrote the file — the assert on the first pattern passed, "DONE" printed, the amended
+   commit and both container verifications ran the UNREVERTED change, and it surfaced only as an
+   impossible installed-file content three verification rounds later. Chain all replacements on
+   one variable, write once, and after any multi-edit script GREP the final file for both edits
+   (and for what must be gone) before committing.
 
 ## 8. Feedback sweep (do it between every task)
 
