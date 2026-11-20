@@ -728,6 +728,38 @@ Known rough edges:
      move there is a follow-up opportunity, not a prerequisite for a package conversion (the
      libpcre conversion was merged as-is).
 
+  64. **python-modules-kit `builtin-pypi` specs: the generator's dep and version mechanics decide
+      the spec shape** (textual #951 → kit-fixups#634, 2026-11-20; read from mark-devkit
+      `pkg/autogen/generators/builtin_pypi.go`, then every claim regenerated + built):
+      (a) WITHOUT explicit `pydeps:` the generator parses PyPI `requires_dist` by splitting on `;`
+      and DISCARDING the marker — every `extra == "..."` dep becomes an UNCONDITIONAL dep (textual's
+      `syntax` extra would pull the whole tree-sitter family), and pin-LESS deps are silently
+      DROPPED (`mdit-py-plugins` carries no pin). Declare `pydeps` explicitly (aiohttp/urllib3
+      shape: `py:all:both` for runtime deps of PEP517 modules) whenever the metadata carries
+      extras or pin-less entries. (b) Version selection is filtered by `python_compat` through a
+      HARDCODED `supportedPythonVersions = ["3.9"]` in mark-devkit — releases whose
+      `Requires-Python` excludes 3.9 never appear (markdown-it-py 4.x, mdit-py-plugins >=0.5.0,
+      linkify-it-py >=2.1.0, uc-micro-py 2.0.0 today) — so interpreter-floor caps are NOT
+      hand-written in specs; when the 3.11 migration (mark-issues#879) lands the list is bumped
+      in mark-devkit and everything re-opens. (c) PyPI's `license` field is NULL/empty for several
+      packages (pygments, markdown-it-py, mdurl, mdit-py-plugins) — set `vars.license:` explicitly
+      (atom vars merge AFTER the generator values, so the override wins; the tree even carries a
+      generated `platformdirs` ebuild with `LICENSE=""` as proof of the default). (d) The
+      template's default `S="${WORKDIR}/{{pypi_name}}-{{pypi_version}}"` uses the PyPI CANONICAL
+      name — sdists whose root differs need `vars.s:` (pygments: sdist root `pygments-2.21.0` vs
+      name `Pygments`; mdit-py-plugins: root `mdit_py_plugins-0.4.2` with underscores); probe
+      EVERY sdist root (`tar -tzf ... | head -1`) against the rendered `S=` before emerging. (e)
+      In python-modules-kit specs the template-facing keys (`s`, `depend`, `rdepend`, `license`,
+      `desc`, `homepage`, `iuse`) are rendered from `vars:` — atom-level placement is silently
+      inert (brotlipy/aiohttp/pycares precedent; proven live: an atom-level `s:` rendered the old
+      default S). (f) `python_compat` must sit at the `defaults:` ATOM level (flit_modules shape);
+      the hatchling_modules cluster carries it under `defaults.vars:` where it is template-only
+      and `GetVersions` then runs with NO Requires-Python filter at all (code-read; the
+      defaults-level filter is build-proven by the flit/setuptools/poetry selections). (g)
+      New python-modules-kit packages currently propagate mark-unstable-ONLY (tqdm
+      macaroni-os/kit-fixups#633 merged without release-branch PRs, 2026-11-20) — §3.20's
+      per-branch merge-atom PRs are not the practice for this kit today; ask before filing them.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
