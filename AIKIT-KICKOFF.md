@@ -18,23 +18,20 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
 ## Board (captured 2026-11-19; re-verify via API at session start)
 | state | item | issue | PR |
 |---|---|---|---|
-| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`). **Round 3 ANSWERED (2026-11-19 ~21:00Z)**: distutils-r1 = negative-proofed (setup.py has no setup()/pyproject — installer helper; pydeps/python_compat render NOTHING under builtin-github — throwaway probe; §3.59) + dep determination (static AST closure + headless mock-serve on 3.11 with optionals ABSENT) → jinja-only necessary&sufficient, NO atoms added; amendment `1ab51041` (comment-only, byte-identical render both trees), reply posted (`issuecomment-7020500555`) incl. the PY_PACKAGES-parity offer + honest tree gaps (jsonschema 4.5.1 < upstream pin; tqdm/textual absent) → **Round 4 RUNNING 2026-11-20**: install-layout inline (build/-dir, /usr/bin entry, downloads dir) + the requested #950/#951 filed | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
+| REVIEW — geaaru asked (16:49Z) to rebuild on `macaroni/mark-experimental` (python 3.11). DONE 2026-11-19: merged spec rendered BYTE-IDENTICAL on the experimental image (ebuild sha `c470c46f…`) and `emerge`-built green (`cuda cuda_sm_120`); `import serve.server` OK on python 3.11.16 (TypeError on 3.9 reproduced fresh in 932). One amendment: RDEPEND += `dev-python/jinja` (only unguarded third-party import; serve/frontend.py:29) → head `b6c520e`, re-verified BOTH trees (ebuild sha `b8c625b5…`, EMERGE-RC=0 + byte-identical installs). Reply draft delivered to orchestrator, NOT yet posted → **POSTED 2026-11-19** (`issuecomment-7017251111`). geaaru followed up (17:50Z): the venue's 3.11 is applied by the mark-stages `python_upgrade` hook and **`ego sync` reverts it** — verified in 932-exp (make.defaults back to `python3_9`, installed/eselect 3.11 persists) and answered with the recovery recipe + the proof that this spec is target-insensitive (`issuecomment-7018254099`). **Round 3 ANSWERED (2026-11-19 ~21:00Z)**: distutils-r1 = negative-proofed (setup.py has no setup()/pyproject — installer helper; pydeps/python_compat render NOTHING under builtin-github — throwaway probe; §3.59) + dep determination (static AST closure + headless mock-serve on 3.11 with optionals ABSENT) → jinja-only necessary&sufficient, NO atoms added; amendment `1ab51041` (comment-only, byte-identical render both trees), reply posted (`issuecomment-7020500555`) incl. the PY_PACKAGES-parity offer + honest tree gaps (jsonschema 4.5.1 < upstream pin; tqdm/textual absent) → **Round 4 IN PROGRESS 2026-11-20**: layout work was implemented+verified then HELD at operator request, rolled back clean (no public trace); operator decision → RE-LANDING with proof (`ses_e09d3344affe…` follow-up: 2 seds kill `/usr/share/maya/build` indirection, `/usr/bin/maya-server` launcher with `--models-dir $HOME/Maya-data/models` default, verify 932 + exp2, mm3 rc-2 wording fix in body). **Posted meanwhile**: venue thread comment (fresh hook reproduction on exp2 incl. pillow-3.13 libdir-drift fix + package.use-directory trap; **v1.1.68 shipped and the spec rides it**) `issuecomment-7030563847` + mm3 `--help` rc-2 correction on #932 (`issuecomment-7030554373`). Containers: `mark-contrib-932-exp` DELETED (user-confirmed; exp2 is THE venue now — hook state + maya emerged). §3.61 (venue-boot reproduction + traps) committed by the loop. | app-ai/maya | #932 (claimed, evidence comment posted) | kit-fixups#628 |
 | OPEN awaiting review (1 commit `7c7fd5a`, MERGEABLE, engine-only atom) | app-ai/strata (source) | #933 (claimed; evidence comment posted incl. the terminal-floor decision) | kit-fixups#630 |
 | OPEN awaiting review — REWORKED per geaaru on #949 ("tarballs instead of AppImage"): now `strata-control`-tarball-based (version-free matcher rides the component skew per tag; engines stay runtime-fetched — per-release asset fluctuation + collision evidence in body); 1 commit `bcfc755` (was `44bc023`), reply posted (`issuecomment-7020417748`) + pointer on the PR → **Round 2 ANSWERED 2026-11-20**: engines IN per geaaru — USE surface (`cuda12 cuda13 hip_rx6000 hip_rx9070 hip_rx7900 hip_halo sycl arm64_cuda13`, `_` not `-` since USEs can't hyphenate; REQUIRED_USE arch ties; `{{ .Values.p }}` distfiles; version-free matchers stay), KEYWORDS line dropped (`KEYWORDS="*"` render proof), default-USE + `USE=cuda13` emerges green byte-identical; fluctuation = hard-fail on gated-but-absent (v0.2.15/0.2.14 repros) → no sanctioned opt-out → **mark-devkit ask drafted** (`assets[].optional: true` — NOT filed yet, maintainer's call). Head `04a8a5c`; threaded replies posted on both inline threads | app-ai/strata-bin | #949 (claimed; probe + rework evidence posted) | kit-fixups#631 |
 
 ## Sandboxes (one-container rule, §6)
-- `mark-contrib-932-exp` — experimental-verification host (image `macaroni/mark-experimental` @ 20260909).
-  End state 2026-11-19: egosync RC=0 (34 kits, **all on `mark-unstable`** — no `mark-experimental` kit
-  branch exists anywhere; the IMAGE supplies python 3.11.16, mask `>=dev-lang/python-3.10` still in
-  core-kit). Installed: mark-devkit 0.36.1, nvidia-cuda-toolkit 13.2.1 (cccl OK), gcc profile
-  switched 16.2.0→**12.3.0** (nvcc 13.2.1 hard-refuses gcc>15 — configure abort), `app-ai/maya-1.1.67`
-  from the amended spec (`/var/db/pkg` ebuild sha `b8c625b5…` == 932's). `/kit-fixups` at PR head
-  `1ab51041` (porcelain 0), ai-kit carries untracked deployed `app-ai/maya/`, evidence tree
-  `/root/exp932/` (gen, gen2, emerge*.log, pre-stage.log, closure.sh). Keep until #628 merges.
-  **Venue caveat (geaaru, hook `mark-stages/jobs/hooks/extras/python_upgrade.yml`):** the session's
-  bootstrap `ego sync` REVERTED the hook's make.defaults edit — `PYTHON_TARGETS/SINGLE_TARGET="python3_9"`
-  again (verified 2026-11-19; installed 3.11.16 + eselect persist). Any PYTHON_TARGETS-sensitive rebuild
-  here must re-apply the hook steps first (recipe in PLAYBOOK §2 venue entry).
+- `mark-contrib-932-exp2` — THE python-3.11 venue since 2026-11-20 (image `macaroni/mark-experimental`
+  @ 20260909; the old `mark-contrib-932-exp` DELETED after cross-checks captured). Bootstrapped with
+  the `python_upgrade` hook reproduced step-by-step at target 3.11 (full recipe + its traps now in
+  PLAYBOOK §3.61: `--noreplace` semantics, `package.use` is a DIRECTORY here — bare `>>` silently
+  loses USE flags, the hook's bare `emerge --unmerge python` would kill the ACTIVE interpreter).
+  State: `make.defaults` → `python3_11`, eselect python3.11, only `/usr/lib/python3.11` (pillow
+  libdir-drift fixed, 3.13-REQUIRES count 0), mark-devkit 0.36.1, toolkit 13.2.1, gcc 12.3.0,
+  `app-ai/maya-1.1.67` emerged green (876 files) + mock-serve proven. `/kit-fixups` at PR head.
+  Keep until #628 merges.
 - `mark-contrib-932` — Maya loop. `/kit-fixups` on branch `maya-autogen-932` (clean, = PR head `1ab51041`
   after the jinja amendment + force-with-lease push 2026-11-19 ~17:45Z).
   **`clean-base` snapshot must NOT be renewed**: the current state (nvidia-cuda-toolkit-13.2.1,
@@ -51,8 +48,6 @@ Never package model weights (GGUF/`.pack`, tens–hundreds of GB, runtime downlo
   + `/opt/strata-engine-cuda13` relocation probes kept), `/root/b949` probe artifacts (assets + extracted trees + logs),
   squashfs-tools/mesa-25.3.6/X-stack/strata-bin installed as verification byproducts; ai-kit working
   copy restored. Keep until #631 merges, then prune. NOTE the mesa pin was sandbox-only and removed.
-- `mark-contrib-932-exp` — experimental-verification host — end state recorded above (first bullet of
-  this section).
 - Known toolkit landmines in the image (all disclosed on #628): nvidia-cuda-toolkit 12.9.2 fails
   vs glibc-2.41 (`cospi/sinpi`), 13.3.1 ships 0 cccl files vs its CMake config; **13.2.1 is the
   working tree state**. **Pre-staging a toolkit install: drop `-a`/`--ask` (dies in non-terminal)
@@ -69,7 +64,7 @@ Answer review comments only on PRs whose head-commit trailer says
    `1ab51041`, replies posted). Maintainer's turn; open offer on the table = PY_PACKAGES parity set.
 2. **RUNNING 2026-11-20**: geaaru's morning-before rounds — #628 install-layout inline (kill
    /usr/share/maya/build via sed, direct /usr/bin entry, downloads out of /usr/share → var/home)
-   on `ses_e09d3344affe…` (containers 932+932-exp); #631 engines-back-IN per maintainer call
+   on `ses_e09d3344affe…` (containers 932+932-exp2); #631 engines-back-IN per maintainer call
    (USE-gated per-backend assets + arm64 custom USEs + required_use arch ties, drop KEYWORDS line,
    fluctuation problem = central probe) on `ses_e09d3344affd…` (container 949). Reply drafts →
    orchestrator posts. **Done direct**: geaaru's tqdm/textual request → filed #950/#951
