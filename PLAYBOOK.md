@@ -814,6 +814,23 @@ Known rough edges:
       maya's parity would need `jsonschema>=4.18,<5` (tree serves 4.5.1), plus `tqdm`/`textual`
       which DON'T EXIST — offer parity only with the honest diff disclosed.
 
+  60. **USE-gated `assets:` resolve at GENERATION time and hard-fail on absence** (strata-bin #949
+      engines round, kit-fixups#631): `builtin_github.GetAssets` iterates every asset with no USE
+      awareness — a matcher with zero hits ABORTS atom generation ("no asset found for matcher …")
+      **while `autogen-thin` still exits rc 0** (log-only failure; the artifact-exists assert is the
+      only gate — §7e family), and at tip the generator downloads/digests ALL gated assets (3.5 GB
+      for the 10-asset Strata matrix) even for a default-USE build. `AutogenAsset` has no optional
+      field; `ignore_artefacts` is atom-wide and drops every Manifest digest. Consequences for
+      release-asset products whose per-tag matrix fluctuates (Strata: v0.2.15 zero linux-x86_64
+      engines, v0.2.14 no sycl, aarch64 engines only from v0.2.7): USE-gated entries generate fine
+      on full-matrix tips but CANNOT generate on otherwise-valid older tags — sweep the full matrix
+      via the Release API BEFORE designing the USE surface (and note `hip-rdna2/3` were windows-only
+      ids: name flags off the real linux suffixes). USE flags cannot contain hyphens — map
+      `hip-rx6000` → `hip_rx6000`, arch-prefixed `arm64_cuda13` + `REQUIRED_USE` arch ties is the
+      sanctioned stand-in for multi-USE asset conditions (geaaru's own prescription); aarch64
+      verification without an arm64 sandbox stays gen-level, disclosed. Feature ask drafted (not
+      filed): `assets[].optional: true` → zero-hit = skip with WARN, no artefact/digest/SRC_URI.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
