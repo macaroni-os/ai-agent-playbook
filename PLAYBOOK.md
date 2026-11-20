@@ -898,6 +898,17 @@ Known rough edges:
       home-based folders out by design; sed'ing it silently disabled the listing while the real
       download target (the `maya.py` chain) needed exactly one file's six sites.
 
+  63. **A spec `body:`/phase comment is ARTIFACT text, not a spec comment** (strata-bin #631
+      drop-the-AppImage round, 2026-11-20): geaaru asked to drop AppImage archaeology from the
+      cluster comments; the before/after render oracle proved one of those comments lived inside
+      the entry's `body:` block and was rendered verbatim into the generated ebuild's `src_install`
+      — spec-comment cleanup there changes the shipped ebuild text. Treat every string under
+      `body:`/phase keys as what maintainers will read in the MERGED ebuild (no review archaeology,
+      no issue-history narration — cite upstream file:line instead); keep the history in the PR
+      body. Verification pattern for "comment-only" spec edits stays cheap-proof: render before +
+      after and diff — if the ONLY hunks are comment lines, amend; anything else means the "comment"
+      was artifact text or the edit touched structure.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
