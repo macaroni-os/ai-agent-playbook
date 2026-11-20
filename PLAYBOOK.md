@@ -88,7 +88,11 @@ Known rough edges:
   `Missing git token! Push interrupted!` but **exits 0 and produces no output dir** — a generation
   "success" with zero artifacts. Always assert the generated ebuild file exists (and is non-empty)
   after every autogen-thin run, independent of rc, and treat an empty `--to` dir as a token-plumbing
-  failure (§2 `--env` position trap), not a generator bug. Same round's §7e-on-tooling near-miss: an
+  failure (§2 `--env` position trap), not a generator bug. A **second, unrelated silent shape**
+  (tqdm #950, 2026-11-20): the template engine itself missing — on an image without `j2` the run logs
+  `exec: "j2": executable file not found in $PATH`, still downloads the asset and writes the
+  `Manifest`, but renders **no ebuild**, rc 0. `emerge -1 dev-python/j2cli` fixes it; the
+  artifact-exists assert catches it. Same round's §7e-on-tooling near-miss: an
   extraction that yields a **0-byte file** made a "clean" render-audit verdict vacuous — assert the
   artifact backs the check BEFORE trusting a green (re-derive from raw, cf. §7v).
 - Detached-build polling: `pgrep -f "emerge --quiet-build"` ALSO matches the `bash -c` wrapper
