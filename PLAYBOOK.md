@@ -82,6 +82,32 @@ Known rough edges:
   repo rename the old URL 404s — `could not read Username for ...` means the REMOTE IS GONE, not a
   bad token. Check `gh api repos/<owner>/<repo> --jq .full_name` before touching credentials, and
   note cross-repo PR heads may need the `owner:repo:branch` label form after a rename.
+- **`macaroni/mark-experimental` is a venue, not a kit branch** (maya #932 feedback round, 2026-11-19):
+  the Incus image from the `macaroni` remote syncs all 34 kits on `mark-unstable` (`ego sync`, `release =
+  mark-unstable` in `/etc/ego.conf`). Its python 3.11 is the **mark-stages `python_upgrade` hook**
+  (`jobs/hooks/extras/python_upgrade.yml`, geaaru 2026-11-19) applied at image-build time over those
+  kits — and **`ego sync` REVERTS its tree-side edits**: verified in-container — after sync,
+  `core-kit/profiles/funtoo/kits/python-kit/mark/make.defaults` reads `PYTHON_TARGETS="python3_9"`
+  again (kit git clean), while the installed `dev-lang/python-3.11.16`, the `eselect python set
+  python3.11` pick and `/etc/portage/package.unmask` persist. Recovery = the hook itself
+  (`python_version2upgrade: 3.11`; the LIVE hook is now `3.13`-targeted — full fresh-container
+  reproduction sequence in §3.61, and beware the drift check there before trusting python smokes):
+  sed make.defaults, unmask, `emerge -j python python-exec
+  --nodeps`, `locale-gen`, rebuild `gobject-introspection glib --nodeps -j`,
+  `PYTHON_TARGETS=python3_11 PYTHON_SINGLE_TARGET=python3_11 emerge -DuvN @world`, eselect-set,
+  then unmerge python:3.9 + `rm -rf /usr/lib/python3.9`. Specs that inherit NO python eclass and
+  declare slot-less dev-python RDEPENDS are insensitive to the revert — #628's amended build proved
+  green post-sync with `python3_9` targets back. Two traps: the image defaults **gcc 16.2.0, which
+  nvcc ≤13.2 rejects** (`unsupported GNU version! gcc versions later than 15`) — `gcc-config` to the
+  shipped 12.x before any CUDA configure; and the image ships **no /root, no meta-repo, no
+  mark-devkit** — bootstrap order: `mkdir -p /root`, detached `ego sync` (sentinel), then
+  `emerge mark-devkit nvidia-cuda-toolkit` (license seed §2). Cross-tree proof that works: gen the
+  same spec in both containers and assert `sha256sum` of the generated ebuild+Manifest are equal.
+- **Background emerges die on interaction and masks** (strata #933 pre-stage, 2026-11-19): a detached
+  `emerge -1av` never prompts — `--ask` in a non-terminal silently kills the install; masked licenses
+  (e.g. `NVIDIA-CUDA` for `dev-util/nvidia-cuda-toolkit`) abort in the resolver instead. Pre-staged
+  dependency installs must drop `-a` AND seed `/etc/portage/package.license` first, and the
+  pre-stage script should end with a `qlist` assertion + `DONE` sentinel, never rely on rc alone.
 - **Never `shred -u` a script that bash is still executing** — the running wrapper's inode vanishes
   and the detached chain dies mid-phase without an error line. Detach a small launcher instead.
 - **`autogen-thin` with `GITHUB_TOKEN` unset fails SILENTLY** (patch #601, 2026-11-15): logs
@@ -732,6 +758,161 @@ Known rough edges:
      move there is a follow-up opportunity, not a prerequisite for a package conversion (the
      libpcre conversion was merged as-is).
 
+  57. **`autogen.kit.d/` layout: spec FILES are flat; subdirs are files_dir payloads only**
+      (ai-kit `app-ai/maya` #932, kit-fixups#628): a new atom's cluster goes into the kit's flat
+      spec file (appended to `ai-kit/autogen.kit.d/base.yml` or a new flat `<name>.yml`), NOT a
+      `<name>/base.yml` — the depth-2 directories there (e.g. `ollama/`) hold only the `files_dir`
+      payloads (confd/initd/service/envd) that `mark-devkit --specfile` consumes as flat files.
+      Same round, three reusable new-package shapes: (a) upstream CMake projects that
+      `FetchContent`-clone a pinned dependency at configure time become hermetic by adding that
+      exact commit as a SECOND spec `assets:` entry and pointing upstream's own local-directory
+      switch at it (`STRATA_GGML_DIR` for project-maya; nvcc's include path inside the sandbox
+      build is the proof); (b) a `undefined reference` link fail that appears ONLY through portage
+      (raw build green) is usually the eclass build type lacking `NDEBUG` — fix spec-side with
+      `extra_envs: ['CMAKE_BUILD_TYPE=Release']` (renders pre-`inherit`) and prove it with `nm`
+      symbol counts on the raw vs failed object; (c) when upstream gates the main target behind
+      GPU backends (`if(STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP)` → configure succeeds but builds
+      NO target), the honest spec requires the GPU USE flag instead of pretending a CPU shape —
+      say so in the PR and reproduce the no-backend build to show the missing target.
+
+  58. **AppImage `-bin` atoms: two unpack traps, both spec-side** (ai-kit `app-ai/strata-bin` #949,
+      kit-fixups#631): (a) portage `unpack()` does NOT dispatch `.AppImage` (empty WORKDIR, fails
+      later with `chmod: cannot access '<app>.AppImage'`) — stage it explicitly with
+      `cp "${DISTDIR}/${A}"` (the jq-bin/plantuml intact-archive idiom) then run `--appimage-extract`;
+      (b) a Tauri/linuxdeploy AppImage **self-extracts headless with no system unsquashfs** (proved
+      in a clean dir with unsquashfs removed → no BDEPEND needed) but **plain `unsquashfs` on the raw
+      asset FAILS** (`Can't find a SQUASHFS superblock`) — the naive fallback is not an option, so
+      `--appimage-extract` is the ONLY extraction path. Install to `/usr/lib/<pn>/` with a
+      `/usr/bin` symlink (pi-bin idiom); the unpacked `usr/bin` binary is the `Exec=` name so pick
+      that as the symlink target (upstream's own name → `strata-desktop`), avoiding a collision with
+      a same-upstream SOURCE atom (here `/usr/bin/strata*` from #630 vs `/usr/bin/strata-desktop` —
+      disjoint by file-set, so NO mutual-block, unlike opencode/opencode-bin which share the path).
+      Two disclosures that held the verification bar honest: bundled webkit means the system RDEPEND
+      is only the ~8-lib host base (ldd 0 unresolved), and a headless GUI launch aborts at `Failed to
+      initialize GTK` — capture the startup trace (host served, engine-absence handled) as the smoke,
+      never claim rendering. The RDEPEND closure can pull a mesa that hits the python-3.10 floor
+      (see the loop's tree note) — pin the tree's older mesa in the sandbox to build, remove the pin
+      before hand-off, and disclose it. FOLLOW-UP (same PR, geaaru: "use the linux tarballs instead
+      of the AppImage"): the shipped shape became the `strata-control` TARBALL — and the rework
+      produced the pattern for **-bin atoms whose component assets version independently of the app
+      tags** (control 0.1.62 @ v0.2.16, 0.1.61 @ v0.2.15, dual 0.1.60/0.1.60.1 @ v0.2.14 — so
+      `{{ .Values.version }}`-templated asset names are IMPOSSIBLE): use a VERSION-FREE `matcher:`
+      (`strata-control-[0-9.]+-linux-x86_64\.tar\.gz`) resolved against the *selected release
+      itself*, and rename the distfile to the app version (`name:`) so it stays unique per PV;
+      prove the ride with two selector renders (`<0.2.16` → the 0.1.61 asset). Per-release asset
+      fluctuation is a packaging argument too: v0.2.15 ships NO x86_64 engine assets at all, so
+      `use:`-gated engine entries would hard-break autogen on such tags — verify the full per-tag
+      asset matrix (Release-API sweep) before gating anything.
+
+  59. **mark-devkit's python machinery is `builtin-pypi`-only — don't reach for distutils-r1**
+      (maya #932 review round, kit-fixups#628, geaaru "Why doesn't use the distutils-r1 eclass?"):
+      `python_compat`/`pydeps`/`pypi_name` are fed ONLY by the PyPI generator (`builtin_pypi.go`) and
+      consumed ONLY by `pypi-generic.tmpl` (the sole tree template with `inherit distutils-r1`) —
+      under `builtin-github` they render NOTHING (proved by a throwaway spec render, restored after:
+      identical ebuild). For app-embedded Python that runs on the SYSTEM interpreter: declare
+      slot-less `dev-python/*` RDEPENDs WITHOUT `${PYTHON_USEDEP}` (target-pinning would misclaim on
+      release branches where `make.defaults` resolves only `python3_9`), and answer "missing deps"
+      with a determination, not a guess: static AST closure over the INSTALLED tree (module-level
+      unguarded imports only) PLUS a dynamic headless run of the app's serve entry (mock/no-model
+      mode where it exists) on the version the app needs, with the optional packages absent —
+      guarded imports surfacing their own `pip install …` errors are the proof they stay
+      undeclared. Before offering a full `PY_PACKAGES`-parity list, sweep the tree for each atom:
+      maya's parity would need `jsonschema>=4.18,<5` (tree serves 4.5.1), plus `tqdm`/`textual`
+      which DON'T EXIST — offer parity only with the honest diff disclosed.
+
+  60. **USE-gated `assets:` resolve at GENERATION time and hard-fail on absence** (strata-bin #949
+      engines round, kit-fixups#631): `builtin_github.GetAssets` iterates every asset with no USE
+      awareness — a matcher with zero hits ABORTS atom generation ("no asset found for matcher …")
+      **while `autogen-thin` still exits rc 0** (log-only failure; the artifact-exists assert is the
+      only gate — §7e family), and at tip the generator downloads/digests ALL gated assets (3.5 GB
+      for the 10-asset Strata matrix) even for a default-USE build. `AutogenAsset` has no optional
+      field; `ignore_artefacts` is atom-wide and drops every Manifest digest. Consequences for
+      release-asset products whose per-tag matrix fluctuates (Strata: v0.2.15 zero linux-x86_64
+      engines, v0.2.14 no sycl, aarch64 engines only from v0.2.7): USE-gated entries generate fine
+      on full-matrix tips but CANNOT generate on otherwise-valid older tags — sweep the full matrix
+      via the Release API BEFORE designing the USE surface (and note `hip-rdna2/3` were windows-only
+      ids: name flags off the real linux suffixes). USE flags cannot contain hyphens — map
+      `hip-rx6000` → `hip_rx6000`, arch-prefixed `arm64_cuda13` + `REQUIRED_USE` arch ties is the
+      sanctioned stand-in for multi-USE asset conditions (geaaru's own prescription); aarch64
+      verification without an arm64 sandbox stays gen-level, disclosed. Feature ask drafted (not
+      filed): `assets[].optional: true` → zero-hit = skip with WARN, no artefact/digest/SRC_URI.
+
+  61. **macaroni python venues drift; reproduce the `python_upgrade` hook, then check
+      installed-vs-active libdir before trusting any python smoke** (maya #932, geaaru 2026-11-20,
+      after a venue run passed only because the image's python and its dev-python files happened to
+      agree): the `macaroni/mark-experimental` image ships `dev-lang/python-3.11.16` +
+      `eselect python3.11` + 3.9 already unmerged, and the user's own container showed the drift:
+      `dev-python/pillow-12.2.0-r1` installed against `python3.13` REQUIRES with a `3.13`-libdir
+      file set (2602 files) while `python3` ran **3.11** — `import PIL` failed. The hook's own
+      migration tools CANNOT fix that (`python-updater`/`@python-module-updates --use-old-libdir`
+      only consider already-installed atoms; every emerge line is `--noreplace` = "do not
+      re-emerge installed") — a same-version `emerge` is a no-op on the FILES: portage never
+      rewrites what is already installed, so a re-emerge "copies" the old files in the sense that
+      nothing is rebuilt; `--force-reinstall`/`--nodeps` don't target the drift either (the
+      interpreter switch does not mark same-version deps out-of-date without the `changed-deps`
+      feature). Surgical fix for a drifted package: `emerge --unmerge <cpv> && emerge -1av
+      <cpv>` (re-merges clean against the active interpreter — pillow → 2595 files, `cmp`-equal
+      to a reference install; maya itself was never drifted so a re-emerge was pointless — its
+      serve smoke was already valid). Reproducing the hook on a fresh container (target 3.11);
+      the LIVE hook (`jobs/hooks/extras/python_upgrade.yml` @ phoenix) now carries
+      `python_version2upgrade: 3.13` and `--ignore-srmask '*/*::python-kit'` (NOT
+      `--ignore-package-mask`): sed `PYTHON_(SINGLE_)TARGETS` in
+      `core-kit/profiles/funtoo/kits/python-kit/mark/make.defaults` → unmask `=dev-lang/python-3.11*`
+      + mask `>=dev-lang/python-3.9` (write INSIDE the `package.unmask`/`package.mask`
+      DIRECTORIES — the image has them as dirs, so the hook's `echo > file` form silently fails) →
+      `--noreplace python python-exec` (no `-1`: this is what lands python in `world`) →
+      `ego update world` (rewrites world from installed — why the user's world says 3.11) → locale
+      entries + `locale-gen` → `--noreplace gobject-introspection glib` → `--noreplace @world` →
+      `eselect python set python3.11` → `python-updater -a --ignore-safepause --noreplace` →
+      `emerge -1 --noreplace @python-module-updates --use-old-libdir` → final `--noreplace python`
+      → old-python removal (`emerge --unmerge dev-lang/python:3.9` + `rm -rf /usr/lib/python3.9` —
+      SKIP the hook's bare `emerge --unmerge python`: on an image-built state the only matching
+      package IS the active interpreter) → `revdep-rebuild -q`. Drop `--ask` everywhere (detached).
+      Venue-boot gotchas: `dev-util/mark-sdk` does not exist and its presence KILLS the whole
+      emerge line (boot `dev-util/mark-devkit` alone); `autogen-thin` is not a binary — run
+      `mark-devkit autogen-thin`; autogen hard-fails ("Missing git token! Push interrupted!")
+      without `GITHUB_TOKEN` even in thin mode; `--specfile autogen.kit.d/base.yml --kitfile
+      merge.kit.d/base.yml` are relative to the KIT dir (`cd /kit-fixups/ai-kit`); the version
+      `selector:` goes INSIDE the `- <pn>:` package entry — at cluster level it is silently
+      ignored. A near-daily upstream can bump mid-session (project-maya v1.1.67→v1.1.68 during
+      this very run): autogen correctly rode it, so when the verification target is the
+      PR-emerged artifact, pin a throwaway selector (`['<1.1.68']` → byte-identical 1.1.67 render,
+      sha256 `b8c625b5…`) and report the new tag to the orchestrator. And on venue boot check
+      whether `/etc/portage/package.{use,unmask,mask}` and `package.license` are FILES or
+      DIRECTORIES (the experimental image ships `package.use`/`package.license` as dirs): a
+      `echo "cat/pkg flag" >> /etc/portage/package.use` dies with "Is a directory", and behind
+      `|| true` it silently builds WITHOUT the intended USE — maya exp2 lost its `cuda` this way
+      (870 files, no engines vs the intended 876/6); write inside the dir
+      (`package.use/<name>`) and assert the `qlist` file count against the reference venue.
+
+  62. **Two portage phase traps when a generated `src_install`/`src_prepare` does more than the
+      template default** (maya #932 layout round, kit-fixups#628, both caught only by a real
+      merge — `bash -n` passes both): (a) `newins` **respects the active `insinto`** — a
+      `src_install` that first does `insinto /usr/share/<pn>` and later `newins launcher` +
+      `fperms 0755 /usr/bin/launcher` stages the file under /usr/share/<pn> and dies in fperms
+      ("No such file or directory"); ship the executable with **`newbin`** (the house idiom,
+      EXEOPTS 0755, sets its own into) or an explicit `into`/`exeinto`. (b) This tree's portage on
+      **EAPI 7 does not dispatch the cmake eclass' exported `src_prepare` through `default`** — a
+      custom `src_prepare() { default; ... }` then dies in configure with `FATAL:
+      cmake_src_prepare has not been run`; call `cmake_src_prepare` explicitly *first* (pattern:
+      dev-util/opencl-icd-loader ebuilds), then sed the sources (seds after it are fine — the
+      eclass' module-strip only touches *.cmake). Related design rule learned the hard way mid-land:
+      before sed'ing an upstream "default path" constant, grep the function that uses it —
+      maya's `serve/models.py` fallback feeds `models_dirs()`, a storage listing that FILTERS
+      home-based folders out by design; sed'ing it silently disabled the listing while the real
+      download target (the `maya.py` chain) needed exactly one file's six sites.
+
+  63. **A spec `body:`/phase comment is ARTIFACT text, not a spec comment** (strata-bin #631
+      drop-the-AppImage round, 2026-11-20): geaaru asked to drop AppImage archaeology from the
+      cluster comments; the before/after render oracle proved one of those comments lived inside
+      the entry's `body:` block and was rendered verbatim into the generated ebuild's `src_install`
+      — spec-comment cleanup there changes the shipped ebuild text. Treat every string under
+      `body:`/phase keys as what maintainers will read in the MERGED ebuild (no review archaeology,
+      no issue-history narration — cite upstream file:line instead); keep the history in the PR
+      body. Verification pattern for "comment-only" spec edits stays cheap-proof: render before +
+      after and diff — if the ONLY hunks are comment lines, amend; anything else means the "comment"
+      was artifact text or the edit touched structure.
+
 ## 4. Fix-pattern quick table
 
 | Symptom | Standard answer |
@@ -1066,6 +1247,39 @@ aa. **NEVER assert absence from truncated API output** (mark-issues#862, 2026-11
     before anything else, STOP if it's not yours (force-pushing over a foreign-trailer branch is
     forbidden); (b) keep the full verification package anyway (`/root/<pkg>*/`) — a STALE round's
     evidence is directly reusable if the winning PR fails review.
+
+
+bb. **Python edit-scripts that call `write_text` twice from a stale `t` silently revert the first
+   edit** (maya #932 layout round, observed 2026-11-20): a spec-edit script did
+   `p.write_text(t.replace(a, b))` and then, for a second edit, recomputed from the ORIGINAL `t`
+   and overwrote the file — the assert on the first pattern passed, "DONE" printed, the amended
+   commit and both container verifications ran the UNREVERTED change, and it surfaced only as an
+   impossible installed-file content three verification rounds later. Chain all replacements on
+   one variable, write once, and after any multi-edit script GREP the final file for both edits
+   (and for what must be gone) before committing.
+
+cc. **Rebase keep-both on a top-level-cluster conflict must be reconstructed, not
+    marker-stripped** (maya #628 rebase onto post-#630 `mark-unstable`, 2026-11-20): the maya
+      cluster and the merged strata cluster BOTH append a new top-level key at the EOF of
+      `ai-kit/autogen.kit.d/base.yml`, so git reports a content conflict with the two keys
+      side-by-side. Deleting the `<<<< ====> >>>>` lines keeps BOTH full cluster bodies — but they
+      are already BOTH in the conflicted region, so the result was a file where `strata:` (line
+      1143) and `maya:` (1144) sat adjacent with strata's whole block stranded INSIDE maya (1567
+      lines vs the correct 1677; autogen then aborts with no ebuild — §7e silent-success caught it
+      via the artifact assert). The correct fix is deterministic reconstruction, not merge
+      cleverness: `git show origin/<br>:<file> > file` (the clean upstream file, strata intact)
+      then `git show <our-head>:<file> | awk '/^maya:/{f=1} f' >> file` (append ONLY our cluster
+      from our own pre-rebase commit) — then assert the two invariants: head-of-file `diff` against
+      upstream is empty (PREFIX-IDENTICAL) and the tail `diff` against our commit is empty
+      (TAIL-IDENTICAL). `merge.kit.d` conflicted the same way but is a flat list where the naive
+      strip WAS right (verify by `diff` vs upstream = exactly the one added `- pkg:` line). ALWAYS
+      re-verify by regenerating EVERY top-level cluster in the file (both maya AND strata from the
+      rebased spec), not just yours — the strata generation is what proved the neighbor survived;
+      the render diff against your own pre-rebase ebuild shows only the version-line bump (tip
+      rode 1.1.68→1.1.69 mid-rebase) — regenerate the OLD head to the SAME tip and cmp
+      BYTE-IDENTICAL to separate "my rebase broke it" from "upstream moved". autogen-thin needs
+      `--kitfile merge.kit.d/base.yml` too (rc=1 "No kitfile param defined" without it, and `--ask`
+      is never used).
 
 ## 8. Feedback sweep (do it between every task)
 
