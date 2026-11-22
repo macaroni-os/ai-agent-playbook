@@ -1567,6 +1567,13 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
      iterating, but before pushing restore the first valid version for NEW packages (no
      `+N`; the upstream version alone) and keep a single `+N` bump (master+1) for existing
      packages (geaaru on the step2 round). The pushed tree must carry the initial versions.
+   - **Commit history is the release changelog**: goreleaser builds the MFS release notes
+     from the commit log, so a multi-package change must NOT be squashed into one commit
+     (geaaru, 2026-11-22). Use `scripts/bumper.sh` (or reproduce its pattern): new package =
+     `DESCR_POSTFIX=" (new package)" BUMPER_DIR="./packages/" sh scripts/bumper.sh`, new
+     version = `BUMPER_DIR="./packages/" sh scripts/bumper.sh`; the script stages+commits
+     each changed package directory with `<cat>/<name>: Bump v.<version>[ (new package)]`.
+     Keep the org trailers (`LLM-assisted-by`/`Signed-off-by`) on every such commit.
    - **Do not `flat_image` an intermediate image**: anise's flatten (and a manual
      `docker import`) produces a config-less image — the step1 `ENV MFS=/mfs` etc. are
      lost, so dependents build with empty `${MFS}` and install into the wrong tree
