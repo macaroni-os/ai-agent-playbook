@@ -902,16 +902,35 @@ Known rough edges:
       home-based folders out by design; sed'ing it silently disabled the listing while the real
       download target (the `maya.py` chain) needed exactly one file's six sites.
 
-  63. **A spec `body:`/phase comment is ARTIFACT text, not a spec comment** (strata-bin #631
-      drop-the-AppImage round, 2026-11-20): geaaru asked to drop AppImage archaeology from the
-      cluster comments; the before/after render oracle proved one of those comments lived inside
-      the entry's `body:` block and was rendered verbatim into the generated ebuild's `src_install`
-      — spec-comment cleanup there changes the shipped ebuild text. Treat every string under
-      `body:`/phase keys as what maintainers will read in the MERGED ebuild (no review archaeology,
-      no issue-history narration — cite upstream file:line instead); keep the history in the PR
-      body. Verification pattern for "comment-only" spec edits stays cheap-proof: render before +
-      after and diff — if the ONLY hunks are comment lines, amend; anything else means the "comment"
-      was artifact text or the edit touched structure.
+  63. **A spec `body:`/phase comment is ARTIFACT text — keep body comments minimal, history goes
+      to the issue/PR description** (strata-bin #631 drop-the-AppImage round + maya #628 round 5,
+      2026-11-20; geaaru explicitly: "Reduce comments in general for `body` content in order to
+      have a more clear ebuild. Add a note in your plabook" and "This type of comment could be
+      added in the issue as history … Or in the PR description."): geaaru asked to drop AppImage
+      archaeology from the cluster comments; the before/after render oracle proved one of those
+      comments lived inside the entry's `body:` block and was rendered verbatim into the generated
+      ebuild's `src_install` — spec-comment cleanup there changes the shipped ebuild text. House
+      rule: inside `body:` (and anything that renders) keep only SHORT operational notes — cite
+      upstream file:line for why a sed/phase step exists ("BUILD constant, maya.py:103"), never
+      narrate who-asked-for-what or review rounds ("the maintainer review #628 asked for exactly
+      this…"); a single issue-reference line where the logic needs context, full rationale in the
+      PR body/issue. Spec-file comments OUTSIDE body: (cluster headers) may carry the design
+      rationale but no PR-history either. Verification pattern for "comment-only" spec edits stays
+      cheap-proof: render before + after and diff — if the ONLY hunks are comment lines, amend;
+      anything else means the "comment" was artifact text or the edit touched structure.
+
+  64. **OpenRC payloads must be RUNTIME-cycled, and two failures only a real start reveals**
+      (maya #628 services round, 2026-11-20): (a) `enewuser/enewgroup` in `pkg_setup` needs the
+      **user** eclass in the spec `inherit:` list — the first merge died `enewuser: command not
+      found` (autogen-thin can't see this; only emerge does); (b) `start-stop-daemon --stdout
+      /var/log/x.log` opens the logfile AFTER dropping to the daemon uid → `Permission denied`
+      even with correct dir ownership; fix = `checkpath -f -m 0640 -u <user> -g <user> <log>` in
+      `start_pre` before the start. Cycle every init script end-to-end in the sandbox
+      (`rc-service <pn> start` → assert the daemon runs AS the user with the env you think you set
+      — read `/proc/<pid>/environ`, prove the HTTP surface → `stop` → assert gone; plus one
+      invalid-config refusal) and prove the `use systemd` branch separately by file placement
+      (unit cmp'd, initd absent, confd stays) — no PID1 in containers means the .service is
+      hand-reviewed only, which is the honest disclosure line.
 
 ## 4. Fix-pattern quick table
 
@@ -1279,7 +1298,14 @@ cc. **Rebase keep-both on a top-level-cluster conflict must be reconstructed, no
       rode 1.1.68→1.1.69 mid-rebase) — regenerate the OLD head to the SAME tip and cmp
       BYTE-IDENTICAL to separate "my rebase broke it" from "upstream moved". autogen-thin needs
       `--kitfile merge.kit.d/base.yml` too (rc=1 "No kitfile param defined" without it, and `--ask`
-      is never used).
+      is never used). APPEND MECHANICS (strata-bin #631 rebase onto post-#628, same day — self-inflicted
+      caught by the end-state audit): when re-extracting "our added line(s)" for a flat list like
+      merge.kit.d, NEVER pipe raw `git diff` output into the file — the leading `+` of diff lines
+      becomes literal content (a `+    - pkg: …` line made it into a rebase resolution; generators
+      may not even fail on it — the YAML parsed and autogen passed, so only the FINAL
+      `git diff origin/<br>..HEAD` + a `grep -c '^+ '` literal check caught it). Extract content,
+      not diffs: `git diff A B -- f | grep '^+ ' | sed 's/^+ //'` or just re-type the known line,
+      then re-assert the full pure-addition invariant before pushing.
 
 ## 8. Feedback sweep (do it between every task)
 
