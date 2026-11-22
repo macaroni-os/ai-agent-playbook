@@ -1479,10 +1479,99 @@ Distilled from macaroni-os/macaroni-fs PRs #1–#3 (Oct–Nov 2026).
 9. **Maintainer flow**: geaaru reviews fast, pushes seeds/specs himself between your PRs —
    always `git fetch upstream` + rebase before pushing, and expect seed version collisions
    (the `+N` suffix bumps per build iteration; squash your own intermediate bumps before
-   push). Issues are disabled on macaroni-fs: findings go in PR bodies, discussion on
-   Discord; org attribution trailers + `Signed-off-by` apply (no `ai_ass` label there —
-   only kit-fixups defines it). Sync the PR body with every head push (version `+N`, evidence
-   blocks) — stale body claims land on the reviewer's desk (a "+13" body against a "+11" head).
+   push). macaroni-fs ISSUES ARE OPEN (corrected 2026-11-21 by geaaru on macaroni-os/mark-issues#954 —
+   earlier sessions recorded "issues disabled"; they are not) — file follow-ups there
+   directly, and keep PR bodies as the design/evidence channel. Org attribution trailers +
+   `Signed-off-by` apply (no `ai_ass` label there — only kit-fixups defines it). Sync the PR
+   body with every head push (version `+N`, evidence blocks) — stale body claims land on the
+   reviewer's desk (a "+13" body against a "+11" head).
+10. **Step2 chroot-based temporary tools (step2, 2026-11-21, macaroni-os/macaroni-fs#9)** —
+   the `step2/chroot` package is an IMAGE, not payload: it is `FROM scratch` + `copy` of
+   `step2/base`'s `/mfs` to `/`, so every package that `requires: step2/chroot` runs with the
+   assembled chroot as `/` (`/bin/sh` = bash, `/usr/bin/gcc` = pass-2 gcc, `/proc`/`/dev`
+   from the container runtime). Patterns and traps:
+   - **Sources**: the chroot has NO `wget`/`curl` (it is only the LFS tree). Build
+     `step1/wget` (the tool must exist before step2) and make each step2 `prelude` download
+     into `/sources` only when `step1/sources` did not already install the tarball; unpack
+     under `/build` (NOT in `/sources`) and `rm -rf /build` before the final image, so the
+     source trees never reach the package. `/sources` keeps the tarballs for a later
+     `step2/sources` collector. TLS is the catch: step1 has no TLS stack, so wget needs
+     `step1/openssl` + `step1/ca-certificates` (~2 packages) — `wget` 1.25 has no
+     compile-time CA option, so export `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt`
+     in the chroot env (OpenSSL reads it). Build wget with `--with-libssl-prefix=${MFS}/usr`
+     to bypass pkg-config (not in step1), and `--without-zlib/--without-libpsl/
+     --without-libidn2 --disable-iri` to keep deps minimal. In `step2/base`, list
+     `step1/wget` plus its openssl/ca-certificates deps explicitly in the `anise i` line —
+     anise install does not follow the tree requires, only the package list. OpenSSL in
+     step1 has its own trap: pass `AR`/`RANLIB`/`NM` from `cross-tools/${MFS_TARGET}/bin`
+     (pass-1 binutils installs them unprefixed, as documented in gcc-pass2). Keep ONE
+     dependency per package: chain `ca-certificates -> openssl` (the bundle package makes
+     the dependency real by building the hashed cert dir OpenSSL expects, then `wget`
+     requires only `ca-certificates`) — multiple deps in one `requires:` list were rejected
+     in review. `openssl rehash` SILENTLY SKIPS a bundle file ("does not contain exactly one
+     certificate or CRL"), so split the Mozilla bundle into `cert-NNN.pem` files first
+     (`awk` on the BEGIN/END markers), then rehash and install bundle + certs + `<hash>.0`
+     symlinks together.
+   - **Runtime env belongs to `step2/chroot`**: anise's build Dockerfile emits `ENV` for
+     `env:` and the final image is built FROM that builder image, so `env:` on the chroot
+     package persists into every dependent. That is where `LD_LIBRARY_PATH=/cross-tools/lib`
+     and `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` must live — the step1 `cc1`
+     links against GMP/MPFR/MPC from `/cross-tools` and cannot run without the first, and
+     OpenSSL/wget needs the CA bundle path because wget has no compile-time option for it.
+     Both were captured in the chroot (`echo $LD_LIBRARY_PATH` / `echo $SSL_CERT_FILE`).
+   - **Payload vs live install**: the house double-install order matters. `make install`
+     then `make install DESTDIR=<pkgdir>` produces diverging files (Perl man pages at the
+     destination root, `.packlist` with DESTDIR paths; bison's `liby.a` archive member
+     timestamps; Python's pyc mtime headers). Invert it: `make DESTDIR=<pkgdir> install`
+     then `cp -a <pkgdir>/. /` so payload == live by construction. **Perl is the exception**:
+     it does not support DESTDIR at all — install it live like the book and copy the files
+     the install created into the package tree via a before/after `find -printf
+     '%p|%i|%s|%T@'` snapshot (`comm -13`; filter to `-type f -o -type l` and skip the prune
+     paths — the root `/` line otherwise `cp -a`s `/proc`, which is what bit the first run).
+     Perl's live `.packlist` keeps the correct `/usr` paths.
+   - **Chain the builds in book order** (geaaru review): `gettext -> bison -> perl ->
+     zlib -> python -> texinfo -> util-linux`, each package requiring the PREVIOUS one
+     instead of every one requiring `step2/chroot` — the last image is then the assembled
+     chroot, and build-time deps like texinfo's Perl are covered by construction (its
+     configure hard-fails `perl not found; Texinfo requires Perl`). Put **zlib before
+     python** or the zlib module silently disappears (Portage/Ego need gzip through
+     Python); Python's optional modules absent at this stage (ssl/sqlite3/ctypes) are
+     expected.
+   - **Version bumps are local-only**: bump a package to bust the anise image cache while
+     iterating, but before pushing restore the first valid version for NEW packages (no
+     `+N`; the upstream version alone) and keep a single `+N` bump (master+1) for existing
+     packages (geaaru on the step2 round). The pushed tree must carry the initial versions.
+   - **Do not `flat_image` an intermediate image**: anise's flatten (and a manual
+     `docker import`) produces a config-less image — the step1 `ENV MFS=/mfs` etc. are
+     lost, so dependents build with empty `${MFS}` and install into the wrong tree
+     (`/sources` not `${MFS}/sources`). Flat images are only safe for leaf images that are
+     never a build dependency. In the sandbox, a deep dependency image can still be
+     flattened for a build by re-applying the config at import time
+     (`docker import --change "ENV MFS=/mfs" … --change "WORKDIR /anisebuild"`).
+   - **Local-repo traps in `step2/base`** (all fixed in macaroni-os/macaroni-fs#9): `yq4`
+     needs `-i` for in-place edits (without it `mfs-local.yml` keeps `PLACEHOLDER_URL` and
+     the install resolves nothing); the step1 install list had `step1/mpr` (typo for `mpc`)
+     and a duplicated `step1/gzip`. Local mode needs a served repo: `anise-build create-repo
+     --type http --urls http://172.17.0.1:8000 --tree <checkout>/packages --output
+     <repo-dir> --packages <repo-dir> …` + `anise-build serve-repo --port 8000 --dir
+     <repo-dir>` (bridge gateway from build containers), and values
+     `local_build: true`/`local_reponame`/`local_repourl`. Keep the repo dir OUT of the
+     checkout: `make build` starts with `clean` and deletes `build/`.
+   - **Sandbox**: `phoenix-builder` is not a safe assumption (images.macaronios
+     simplestreams index 404'd 2026-11-21 and the alias pointed at a deleted serial). A
+     plain `mark-unstable` Incus image works: `emerge app-admin/anise-build
+     app-emulation/docker docker-cli`, `dockerd --storage-driver=overlay2` (the Macaroni
+     docker build has NO btrfs graphdriver — `strings dockerd | grep BTRFS_IOC_SUBVOL_CREATE`
+     is empty), `docker` Incus profile for nesting/netfilter. **overlay2's hard 128
+     lower-layer limit** breaks deep anise-build chains at export time (`max depth
+     exceeded` on `docker create`): the long step1 package chain reached it at the tail.
+     Sandbox-only recovery (not spec content): `docker save` the image, extract the layer
+     tars, apply them in order with whiteout handling (`.wh.<name>` delete, `.wh..wh..opq`
+     opaque-dir clear), `tar -C rootfs -c . | docker import - <temp>`, retag to the same
+     `FinalImageHash`, then export the missing artifacts with `anise-build build --nodeps`
+     (no `make` — it would `clean` the destination). Step2 chains (builder → base →
+     sources/chroot → tool) stay shallow.
+
 ab. **`git commit --amend` commits the INDEX, not your working-tree edits** (two hits on
    2026-11-15, kit-fixups#587 + #602 rounds): a fix made with `sed -i`/editors but never
    `git add`-ed leaves the amend a no-op while the public reply claims the change — one of
