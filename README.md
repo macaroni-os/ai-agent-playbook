@@ -16,6 +16,7 @@ the conventions the maintainers actually asked for.
 | [MFS-KICKOFF.md](MFS-KICKOFF.md) | living session-handoff for the macaroni-fs (§10) loop: board state + task order — refresh it every session so a reboot can't erase it |
 | [COREKIT-KICKOFF.md](COREKIT-KICKOFF.md) | living session-handoff for the core-kit autogen epic (mark-issues#880) loop: child-issue board + sandbox map + task order — refresh every session |
 | [AIKIT-KICKOFF.md](AIKIT-KICKOFF.md) | living session-handoff for the ai-kit Maya/Strata epic (mark-issues#930) loop: board + sandbox map + task order — refresh every session |
+| [PCRE2-KICKOFF.md](PCRE2-KICKOFF.md) | living session-handoff for the PCRE1→PCRE2 autogen conversion epic (mark-issues#931) loop: board + sandbox map + task order — refresh every session |
 
 ## Quick start
 1. `git clone` this repo on your workstation.
