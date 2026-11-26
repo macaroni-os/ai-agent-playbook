@@ -1,4 +1,4 @@
-# MFS loop — session handoff (2026-11-21 refresh — step2 PR in review)
+# MFS loop — session handoff (2026-11-22 refresh — step2 MERGED)
 
 Read PLAYBOOK.md first — §10 is the macaroni-fs loop (§10.10 is the step2 pattern), §5/§6/§7/§8
 apply as written (§2–§4 and the kit-fixups parts of §7 do NOT apply to macaroni-fs). Verify the
@@ -8,13 +8,20 @@ board below live before acting.
 - Issue https://github.com/macaroni-os/mark-issues/issues/954 (`[macaroni-fs] Create step2
   phase specs`, geaaru, 2026-11-21) — claimed by this loop; design/evidence follow-ups posted.
   **macaroni-fs issues are NOT disabled** (geaaru, same day): use that repo for follow-ups.
-- **PR https://github.com/macaroni-os/macaroni-fs/pull/9 OPEN** — head `524bdf8` (branch
-  `step2-specs`, one commit, MERGEABLE, CI spec validation green). **Round 1 review answered
-  2026-11-21** (six inline threads: /build unpacking, no step2/sources, chained deps,
-  step1/wget; zlib accepted as a top-level comment). Awaiting the next review. Round 2 answered 2026-11-22 (single `requires` on `step1/wget`, versions reset to the first valid ones).
+- **PR https://github.com/macaroni-os/macaroni-fs/pull/9 MERGED** as `2079a76` (spec head
+  `524bdf8`; branch `step2-specs`). Review rounds answered: round 1 (2026-11-21: /build
+  unpacking, no step2/sources, chained deps, step1/wget; zlib accepted) and round 2
+  (2026-11-22: single `requires` on `step1/wget`, versions reset to first valid). geaaru
+  thanked + added a **bumper/changelog convention** note (see below). Follow-up commit on
+  master: `c422230 step1/sources: Bump v.0.20261122`.
+- **Docs PR https://github.com/macaroni-os/ai-agent-playbook/pull/34 MERGED** into `phoenix`
+  (`ba2b7e9`); this refresh is a new branch off that merge.
+- Issue https://github.com/macaroni-os/mark-issues/issues/954: **open**, close suggestion
+  posted after the merge (no `Closes:` from the macaroni-fs PR). Keep it only if step3 needs
+  the thread.
 
-macaroni-os/macaroni-fs: step1 PR #1–#8 all MERGED. The PR adds three step1 packages the
-step2 preludes need, then the seven step2 temporary tools.
+macaroni-os/macaroni-fs: step1 PR #1–#8 all MERGED; the step2 PR merged as `2079a76` added three
+step1 packages for the source fetch plus the seven step2 temporary tools.
 
 ### step1 additions (for the source fetch)
 | package | version | notes |
@@ -68,12 +75,28 @@ to the first valid versions before pushing (new packages carry no `+N`).
   `/root/mfs-probe/` (openssl/wget feasibility probe), `/root/mfs-testtree/` (throwaway
   combined image used before the chain existed), `payload-cmp3.sh`.
 
+## Commit/changelog convention (geaaru, 2026-11-22 — feed into every MFS round)
+MFS releases are built with goreleaser, so the commit history IS the changelog. Use
+`scripts/bumper.sh` (or reproduce its pattern) instead of one squashed commit for a
+multi-package change:
+
+- new package (one commit per package, message
+  `<cat>/<name>: Bump v.<version> (new package)`):
+  `DESCR_POSTFIX=" (new package)" BUMPER_DIR="./packages/" sh scripts/bumper.sh`
+- new version of an existing package (`<cat>/<name>: Bump v.<version>`):
+  `BUMPER_DIR="./packages/" sh scripts/bumper.sh`
+
+The script iterates changed `definition.yaml` files, adds+commits each package directory
+separately. Version style observed in the follow-up: `step1/sources` moved from
+`0.20261111+2` to date-style `0.20261122` (the date of the content change), not a `+N`.
+Future rounds should push such per-package commits (and keep the `LLM-assisted-by` /
+`Signed-off-by` trailers).
+
 ## Task order
-1. **§8 sweep FIRST** — PR #9 comments/reviews + the issue thread (all three endpoints,
-   always). Review asks: one-commit amend + force-with-lease + re-verify payload identity
-   and the chained-image smoke; `make validate` is the CI gate (validation only, it does
-   NOT build).
-2. Once #9 merges: prune `mfs-build` when no review rounds are pending, refresh this file.
+1. **§8 sweep FIRST** — merged PRs can still get comments (geaaru uses the merged PR for
+   process notes); the issue thread stays open. All three endpoints, always.
+2. `mfs-build` can be pruned when no review rounds are pending (see sandbox notes); the
+   sandbox-only flatten artifacts are not needed by the repo.
 3. Next structural step: step3 base with Portage + Ego. That is a structural decision
    (repo wiring, subsets, package manager bootstrap): propose with evidence and let geaaru
    pick (§9). Do not start a batch of step3 specs before that.
