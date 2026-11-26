@@ -339,16 +339,30 @@ Known rough edges:
     in base/restored lines is not this PR's business (keep verbatim; a sweep is a separate ask).
     Verify purges against the **generated** ebuild: sed the old baseline with the same
     substitution and diff — byte-identity proves the change touched nothing else.
-28. **Server services use STATIC uid/gid** (maintainer ask, macaroni-os/kit-fixups#511): read the ids from
+28. **EVERY package using `enewuser`/`enewgroup` takes STATIC uid/gid from the entities-catalog**
+    (maintainer ask, macaroni-os/kit-fixups#511; scope restated by geaaru on kit-fixups#644,
+    2026-11-25: "Check the uid/gid used in `entities-catalog` and use the same. If not present in
+    the catalog create a PR to generate a new static uid/gid" — and "this logic to be used in
+    every package using `enewgroup` or `enewuser`"): read the ids from
     `macaroni-commons/packages/entities/groups.yaml` (the `entities` tool's list, per-service
     `gid:` + `user.uid:` + homedir/shell). If the account is missing there, PR it FIRST, then use
     it — never `enewuser <svc> -1 -1` for a server. Macaroni eclass `enewuser` =
     `user uid shell home groups` — NO gid slot and a literal `/sbin/nologin` shell dies; the
     static gid lands via a pre-created `enewgroup <svc> <gid>` (ntp/epmd precedent), homedir stays
-    `/dev/null` with data dirs handled by `diropts`/`keepdir`.
-29. **Init system is USE-SELECTED, not additive** (maintainer ask + follow-up, macaroni-os/kit-fixups#511):
+    `/dev/null` with data dirs handled by `diropts`/`keepdir`. Proof pattern when re-verifying an
+    existing install: `userdel`/`groupdel` the account in the sandbox FIRST, else the
+    auto-allocated uid survives `pkg_setup` and the static path is never exercised (privoxy #644:
+    after the delete, `id privoxy` → `uid=392(privoxy) gid=392(privoxy)`).
+29. **Init system is USE-SELECTED, not additive — the standing best practice for EVERY daemon**
+    (maintainer ask + follow-up, macaroni-os/kit-fixups#511; geaaru re-asked it as a playbook
+    best-practice note on kit-fixups#639/#643/#644, 2026-11-25: "Store a note about this as best
+    practices" / "Add a note in the playbook to use this logic as best practice"): a `systemd` USE
+    + the `systemd` eclass, and
     `if use systemd ; then systemd_dounit ...; else newinitd ...; fi` — exactly ONE init system
-    installs (geaaru explicitly moved `newinitd` into the `else`). Prefer the unit from the
+    installs (geaaru explicitly moved `newinitd` into the `else`). Variants proven in the same
+    shape: `systemd_newunit "${FILESDIR}/<pn>.service-rN" "<pn>.service"` (metalog #643) and
+    `systemd_install_serviced` for the drop-in (atftp #639); `newconfd` stays OUTSIDE the branch
+    (same `/etc/conf.d` file serves both sides, §3.46). Prefer the unit from the
     upstream tarball (`*.service.in` — instantiate the @VARS@), `Type=` matched to how the daemon
     actually forks (fbguard pattern); proof standard: one merge per USE side, `qlist` shows only
     the unit OR only the initd.
@@ -405,7 +419,10 @@ Known rough edges:
  35. **Version strings render from `.Values`, never `${PV}`** (maintainer ask,
      macaroni-os/kit-fixups#514, 2026-11-01): in a spec `body:` write `{{ .Values.pv }}` (and
      `{{ .Values.version }}`) — NOT the shell var `${PV}` — so the generated ebuild carries the
-     literal (§3.8/§3.15 principle applied to version literals too). When a source flavour must
+     literal (§3.8/§3.15 principle applied to version literals too). `${PF}` likewise: write
+     `{{ .Values.pf }}` and drop `${EPREFIX}` with it (geaaru on kit-fixups#640, 2026-11-25:
+     "Drop EPREFIX and instead of ${PF} use `{{ .Values.pf }}`" — i3 renders
+     `-Ddocdir=/usr/share/doc/i3-4.25.1`, privoxy `--docdir=/usr/share/doc/privoxy-4.2.0`). When a source flavour must
      reference the exact tag build, stamp `{{ .Values.pv }}-{{ substr 0 7 .Values.sha }}` (sprig
      `substr`, already used in-repo by the fish cluster) — e.g. `-X main.Version=3.1.1-9db7df7`.
      **BUT check the generator version:** mark-devkit ≥0.36.1 `builtin_github.go` sets
@@ -931,6 +948,27 @@ Known rough edges:
       invalid-config refusal) and prove the `use systemd` branch separately by file placement
       (unit cmp'd, initd absent, confd stays) — no PID1 in containers means the .service is
       hand-reviewed only, which is the honest disclosure line.
+
+ 65. **Specs carry NO defaults and NO unneeded bounds** (geaaru review round on the PCRE2 autogen
+     batch, macaroni-os/kit-fixups#637–#644, 2026-11-25 — "reduce the specs"):
+     - **`slot: '0'` is the default — never write it** (asked explicitly on #641: "add a note to
+       your playbook that `slot: '0'` is the default. Is not needed. Drop this line and add it only
+       when `SLOT` != 0"; same line flagged on #639/#640/#642/#643/#644).
+     - **No `v`→'' string transform** — mark-devkit strips the leading `v` of tags itself (§3.4,
+       #637/#639: "This is not needed. `v` is removed automatically from `mark-devkit`. Run a test
+       for confirm this"); the proof is a regeneration still selecting the right version.
+     - **Dependencies WITHOUT `>=` unless the bound is mandatory** (#641: "We use this only in few
+       case where is mandatory"; #642: "just use `sys-apps/util-linux`") — `dev-libs/libev`,
+       `sys-libs/zlib`, `sys-apps/util-linux`, not `>=dev-libs/libev-4.01` etc. "Old system could
+       be upgrade with anise if no more supported by the tree" is the stance on legacy floors.
+     - **USE flags for software not in the tree are dropped with their conditionals** (#638:
+       `libressl` gone, ssl block collapsed to `ssl? ( dev-libs/openssl:0=[kerberos(-)?] )`) —
+       the §3.18 house-equivalent rule applied to the dep block itself.
+     - **No `readme.gentoo-r1` in new autogens** (#638): drop `DOC_CONTENTS`/`readme.gentoo_create_doc`
+       /`readme.gentoo_print_elog`; a plain `if use <flag> ; then einfo "…" ; fi` in `pkg_postinst`
+       is the house shape.
+     - A die-guard `true` at the end of a phase body is a smell (#639): rewrite
+       `[ -d x ] && dodoc x/*` + `true` as a plain `if` block.
 
 ## 4. Fix-pattern quick table
 
